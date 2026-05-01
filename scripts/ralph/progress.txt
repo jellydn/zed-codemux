@@ -80,3 +80,14 @@
   - Copying the tmux.rs structure and adapting the command strings is the fastest approach
 ---
 
+## 2026-05-01 16:45 - US-008
+- What was implemented: Added `get_unique_session_name()` function to src/sanitize.rs with gap-filling algorithm
+- Files changed: src/sanitize.rs (added function + tests), scripts/ralph/prd.json (updated US-008 passes: true)
+- **Learnings for future iterations:**
+  - Gap-filling algorithm: start suffix at 2, increment until finding a name not in the sessions list
+  - Uses `std::collections::HashSet<&str>` for O(1) lookup performance
+  - The algorithm fills gaps: ['myapp','myapp-2','myapp-5'] → returns 'myapp-3' (not 'myapp-6')
+  - This matches vscode-mux behavior exactly for multi-window scenarios
+  - Added 6 comprehensive tests covering empty list, base not in list, base exists, gap-filling scenarios
+---
+
