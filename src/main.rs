@@ -13,7 +13,26 @@ use crate::sanitize::{get_unique_session_name, sanitize_session_name};
 use crate::tmux::TmuxLauncher;
 use crate::zellij::ZellijLauncher;
 use anyhow::Result;
+use clap::Parser;
 use std::collections::HashMap;
+
+/// CodeMux - Open Zed terminals inside tmux or zellij
+#[derive(Parser)]
+#[command(name = "codemux")]
+#[command(about = "Open Zed terminals inside tmux or zellij — port of vscode-mux to Zed")]
+#[command(version)]
+#[command(trailing_var_arg = true)]
+#[command(allow_hyphen_values = true)]
+struct Cli {
+    /// Additional arguments to pass to the shell (not currently used)
+    #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+    args: Vec<String>,
+}
+
+/// Checks if debug mode is enabled via CODEMUX_DEBUG=1
+fn debug_enabled(env: &HashMap<String, String>) -> bool {
+    env.get("CODEMUX_DEBUG").map(|v| v == "1").unwrap_or(false)
+}
 
 /// Resolves auto_attach setting: env var overrides config overrides default (true)
 fn resolve_auto_attach(env: &HashMap<String, String>, config: &Config) -> bool {
@@ -62,6 +81,9 @@ fn decide_fallback_shell(env: &HashMap<String, String>) -> String {
 }
 
 fn main() -> Result<()> {
+    // Parse CLI arguments (handles --version and --help)
+    let _cli = Cli::parse();
+
     // Get current working directory
     let cwd = std::env::current_dir()?;
 
@@ -76,20 +98,36 @@ fn main() -> Result<()> {
     // Prepare environment map for testable functions
     let env_map: HashMap<String, String> = std::env::vars().collect();
 
-    // Resolve auto_attach setting
+    // Resolve settings
     let auto_attach = resolve_auto_attach(&env_map, &config);
+    let debug = debug_enabled(&env_map);
+
+    // Debug logging
+    if debug {
+        eprintln!("[codemux] Resolved multiplexer: {:?}", multiplexer);
+        eprintln!("[codemux] Base name: {}", base_name);
+        eprintln!("[codemux] Sanitized name: {}", sanitized_name);
+        eprintln!("[codemux] Auto attach: {}", auto_attach);
+    }
 
     match multiplexer {
         Some(Multiplexer::Tmux) => {
             let launcher = TmuxLauncher::new();
-            run_with_launcher(&launcher, &sanitized_name, &cwd, auto_attach)?;
+            run_with_launcher(&launcher, &sanitized_name, &cwd, auto_attach, debug)?;
         }
         Some(Multiplexer::Zellij) => {
             let launcher = ZellijLauncher::new();
-            run_with_launcher(&launcher, &sanitized_name, &cwd, auto_attach)?;
+            run_with_launcher(&launcher, &sanitized_name, &cwd, auto_attach, debug)?;
         }
         None => {
             // No multiplexer found - fallback to shell
+            if debug {
+                let shell = decide_fallback_shell(&env_map);
+                eprintln!(
+                    "[codemux] No multiplexer found, falling back to shell: {}",
+                    shell
+                );
+            }
             run_fallback_shell(&env_map)?;
         }
     }
@@ -105,6 +143,7 @@ fn run_with_launcher(
     base_name: &str,
     cwd: &std::path::Path,
     auto_attach: bool,
+    debug: bool,
 ) -> Result<()> {
     // Get list of existing sessions
     let sessions = launcher.list_sessions()?;
@@ -124,9 +163,19 @@ fn run_with_launcher(
         get_unique_session_name(base_name, &sessions)
     };
 
+    // Debug logging
+    if debug {
+        eprintln!("[codemux] Final session name: {}", session_name);
+    }
+
     // Build the command string
     let cwd_str = cwd.to_string_lossy().to_string();
     let command = launcher.build_command(&session_name, &cwd_str, auto_attach);
+
+    // Debug logging
+    if debug {
+        eprintln!("[codemux] Full command: {}", command);
+    }
 
     // Execute the command
     exec_command(&command)
@@ -337,5 +386,46 @@ mod tests {
 
         #[cfg(windows)]
         assert_eq!(decide_fallback_shell(&_env), "cmd.exe");
+    }
+
+    // Tests for debug_enabled
+
+    #[test]
+    fn test_debug_enabled_when_set_to_1() {
+        let mut env = HashMap::new();
+        env.insert("CODEMUX_DEBUG".to_string(), "1".to_string());
+
+        assert!(debug_enabled(&env));
+    }
+
+    #[test]
+    fn test_debug_disabled_when_unset() {
+        let env: HashMap<String, String> = HashMap::new();
+
+        assert!(!debug_enabled(&env));
+    }
+
+    #[test]
+    fn test_debug_disabled_when_set_to_0() {
+        let mut env = HashMap::new();
+        env.insert("CODEMUX_DEBUG".to_string(), "0".to_string());
+
+        assert!(!debug_enabled(&env));
+    }
+
+    #[test]
+    fn test_debug_disabled_when_set_to_other_value() {
+        let mut env = HashMap::new();
+        env.insert("CODEMUX_DEBUG".to_string(), "true".to_string());
+
+        assert!(!debug_enabled(&env));
+    }
+
+    #[test]
+    fn test_debug_disabled_when_set_to_empty() {
+        let mut env = HashMap::new();
+        env.insert("CODEMUX_DEBUG".to_string(), "".to_string());
+
+        assert!(!debug_enabled(&env));
     }
 }

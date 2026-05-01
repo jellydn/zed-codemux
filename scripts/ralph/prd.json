@@ -189,8 +189,8 @@
         "Tests pass"
       ],
       "priority": 11,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "CLI struct with clap derive, --version and --help working, CODEMUX_DEBUG logging implemented with 5 unit tests"
     },
     {
       "id": "US-012",
