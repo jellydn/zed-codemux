@@ -119,3 +119,18 @@
   - Pattern: When testing env-dependent functions, use a helper that takes `HashMap<String, String>` for injection
   - All 66 tests pass including 4 tests for `decide_fallback_shell` covering Unix/Windows env and default cases
 ---
+
+## 2026-05-01 18:35 - US-011
+- What was implemented: Added CLI flags (--version, --help) and CODEMUX_DEBUG logging
+- Files changed: src/main.rs (Cli struct with clap derive, debug_enabled function, debug logging throughout, 5 new unit tests)
+- **Learnings for future iterations:**
+  - Clap derive API pattern: `#[derive(Parser)]` with `#[command(name, about, version)]` attributes
+  - For trailing args support: `#[command(trailing_var_arg = true, allow_hyphen_values = true)]`
+  - Debug logging pattern: prefix each line with `[codemux] ` and output to stderr via `eprintln!`
+  - Debug logging includes: multiplexer, base name, sanitized name, auto_attach, final session name, full command
+  - `debug_enabled()` helper uses exact match on "1" (not "true", not case-insensitive)
+  - 5 unit tests for debug_enabled: set to 1, unset, set to 0, set to other value, set to empty
+  - All 71 tests pass (66 original + 5 new)
+  - `--version` outputs: `codemux 0.1.0`
+  - `--help` shows description, usage, and options
+---
