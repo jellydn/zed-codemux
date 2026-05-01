@@ -2,6 +2,8 @@
 - This is a Rust project using Cargo for dependency management
 - Binary crate structure: Cargo.toml with [[bin]] target, src/main.rs as entry point
 - License: MIT with author 'jellydn' and year 2026
+- Pattern for testable env-dependent functions: create a `*_with_env` helper that takes `HashMap<String, String>` for injection
+- The `which` crate is already available for PATH probing (version 6.0)
 
 ## 2026-05-01 12:40 - US-001
 - What was implemented: Scaffolded the Rust binary crate with Cargo.toml, src/main.rs, .gitignore, and LICENSE
@@ -42,3 +44,27 @@
   - Use `toml::from_str().unwrap_or_default()` for graceful fallback on invalid config
   - Serde derive macros work great for simple config structs with optional fields
 ---
+
+## 2026-05-01 14:35 - US-005
+- What was implemented: Added multiplexer detection module (src/detect.rs) with `Multiplexer` enum and `detect_multiplexer()` function
+- Files changed: src/detect.rs (new), src/main.rs (mod declaration), prd.json (US-005 passes: true)
+- **Learnings for future iterations:**
+  - Resolution priority: 1) CODEMUX_MULTIPLEXER env var, 2) config.multiplexer field, 3) PATH probe (tmux first, then zellij)
+  - Pattern for testable env-dependent functions: create a `*_with_env` helper that takes `HashMap<String, String>` for injection
+  - The `which` crate (already in deps) works great for PATH probing
+  - Use `#[allow(dead_code)]` on functions not yet used in main to satisfy clippy -D warnings
+  - Case-insensitive parsing for multiplexer names (TMUX, tmux, Tmux all work)
+---
+
+## 2026-05-01 15:10 - US-006
+- What was implemented: Added multiplexer launcher trait (src/launcher.rs) and tmux implementation (src/tmux.rs)
+- Files changed: src/launcher.rs (new), src/tmux.rs (new), src/main.rs (mod declarations)
+- **Learnings for future iterations:**
+  - Trait definition pattern: use `anyhow::Result` for flexible error handling in trait methods
+  - The `build_command` method returns a String (shell command) not a Command struct - this allows the caller to control execution
+  - For `list_sessions`, return empty Vec on non-zero exit (tmux server not running) rather than error
+  - Always use shell_escape on name and cwd before interpolating into command strings
+  - Pattern for modules with unused functions: add `#[allow(dead_code)]` to struct, impl, and trait
+  - Tmux commands: `tmux new-session -A -s <name>` attaches to existing or creates new; `-c <cwd>` sets working directory
+---
+

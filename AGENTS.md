@@ -2,7 +2,15 @@
 
 ## Project Status
 
-Pre-implementation. Only planning docs exist (no `Cargo.toml`, `src/`, or `extension.toml` yet). The PRD at `tasks/prd-zed-mux.md` is the source of truth for requirements.
+Implementation in progress. The following modules are complete:
+
+- `src/main.rs` — Entry point with module declarations
+- `src/sanitize.rs` — Session name sanitization (matches vscode-mux exactly)
+- `src/shell_escape.rs` — POSIX shell-escape helper
+- `src/config.rs` — TOML config-file loader (`~/.config/codemux/config.toml`)
+- `src/detect.rs` — Multiplexer detection (env → config → PATH)
+
+The PRD at `tasks/prd-zed-mux.md` is the source of truth for requirements.
 
 ## Architecture
 
