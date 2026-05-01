@@ -91,3 +91,19 @@
   - Added 6 comprehensive tests covering empty list, base not in list, base exists, gap-filling scenarios
 ---
 
+## 2026-05-01 17:35 - US-009
+- What was implemented: Wired main entry point to detect multiplexer, compute session name, and exec into multiplexer command
+- Files changed: src/main.rs (complete rewrite - 332 insertions), scripts/ralph/prd.json (updated US-009 passes: true)
+- **Learnings for future iterations:**
+  - Main entry point structure: get CWD → sanitize basename → load config → detect multiplexer → resolve auto_attach → get session name → build command → exec
+  - Auto-attach resolution priority: env `CODEMUX_AUTO_ATTACH` → config.auto_attach → default `true`
+  - Session name selection logic: if auto_attach and base exists in sessions → use base; otherwise use `get_unique_session_name`
+  - Unix exec pattern: use `std::os::unix::process::CommandExt::exec()` to replace process with shell command
+  - Windows spawn pattern: use `Command::status()` then `std::process::exit()` to propagate exit code
+  - Shell command structure: `$SHELL -l -c "tmux new-session -A -s 'name' -c '/path'"`
+  - Fallback shell when no multiplexer: print warning to stderr, then exec user's shell directly
+  - Cross-platform conditional compilation: `#[cfg(unix)]`, `#[cfg(windows)]`, `#[cfg(not(any(unix, windows)))]`
+  - 14 new unit tests for resolve_auto_attach, get_base_name, decide_fallback_shell
+  - All 66 tests pass (including 14 new main module tests)
+---
+
