@@ -134,3 +134,16 @@
   - `--version` outputs: `codemux 0.1.0`
   - `--help` shows description, usage, and options
 ---
+
+## 2026-05-01 19:10 - US-012
+- What was implemented: Added GitHub Actions CI workflow (`.github/workflows/ci.yml`) with build matrix for ubuntu-latest, macos-latest, and windows-latest
+- Files changed: `.github/workflows/ci.yml` (new)
+- **Learnings for future iterations:**
+  - Use `actions/checkout@v4` for checkout, `dtolnay/rust-toolchain@stable` for Rust setup
+  - Include `components: clippy, rustfmt` in the toolchain setup for linting and formatting checks
+  - Use `Swatinem/rust-cache@v2` for caching cargo registry and target dir across runs
+  - Set `cache-on-failure: true` to cache even when builds fail
+  - CI workflow triggers on push to main and pull_request to main
+  - All quality checks verified locally before committing
+  - 71 tests pass, clippy clean, formatting correct
+---
