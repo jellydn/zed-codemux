@@ -161,6 +161,16 @@
 - Two-stage workflow: build-and-release job (matrix) → create-release job (collects artifacts)
 - YAML linting: yamllint passes (only truthy warning on `on:` which is standard for GitHub Actions)
 - All 71 tests pass, clippy clean, formatting correct, build succeeds
+## 2026-05-01 21:05 - US-015
+- What was implemented: Polished README with all required sections and added demo GIF placeholder
+- Files changed: README.md (updated), assets/demo.gif (new), scripts/ralph/prd.json (US-015 passes: true)
+- **Learnings for future iterations:**
+  - Added "Compared to vscode-mux" link block at the top of README (shields.io badge linking to vscode-mux)
+  - Added "Differences from vscode-mux" subsection with feature comparison table (vscode-mux vs CodeMux columns)
+  - Table enumerates: CLI binary approach (no Zed terminal API), no kill subcommand in v1, no per-workspace config in v1
+  - Created 1x1 transparent GIF placeholder (43 bytes) using binary printf to assets/demo.gif
+  - Referenced demo.gif from the "Why CodeMux for Zed?" section with markdown: `![Demo](assets/demo.gif)`
+  - All 71 tests pass, clippy clean, formatting correct
 ---
 
 ## 2026-05-01 21:00 - US-014

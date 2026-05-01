@@ -2,11 +2,14 @@
 
 > Open Zed terminals inside **tmux** or **zellij** — port of [vscode-mux](https://github.com/jellydn/vscode-mux) to the [Zed editor](https://zed.dev).
 
+[![Compared to vscode-mux](https://img.shields.io/badge/compared%20to-vscode--mux-blue)](https://github.com/jellydn/vscode-mux)
 [![tmux](https://img.shields.io/badge/multiplexer-tmux-1BB91F?logo=tmux)](https://github.com/tmux/tmux) [![zellij](https://img.shields.io/badge/multiplexer-zellij-orange)](https://zellij.dev) [![Zed](https://img.shields.io/badge/editor-Zed-084CCF?logo=zedindustries)](https://zed.dev)
 
 ---
 
 ## Why CodeMux for Zed?
+
+![Demo](assets/demo.gif)
 
 If you rely on tmux or zellij for terminal multiplexing, Zed's default terminal experience breaks your flow:
 
@@ -18,6 +21,14 @@ If you rely on tmux or zellij for terminal multiplexing, Zed's default terminal 
 **CodeMux** solves this by making tmux/zellij the default terminal experience in Zed — **one workspace, one persistent session**, shared across editors.
 
 > ✨ When you also use [vscode-mux](https://github.com/jellydn/vscode-mux), opening a project in either VS Code or Zed lands you in the **same multiplexer session** — sanitized session names, multi-window indexing, and auto-attach behavior are byte-for-byte identical.
+
+### Differences from vscode-mux
+
+| Feature                  | vscode-mux                                            | CodeMux for Zed                                                      |
+| ------------------------ | ----------------------------------------------------- | -------------------------------------------------------------------- |
+| **Architecture**         | VS Code extension API provides terminal profile hooks | Zed has no extension API for terminal profiles → CLI binary approach |
+| **`kill` subcommand**    | Available                                             | Not in v1 (use `tmux kill-session` / `zellij kill-session` directly) |
+| **Per-workspace config** | `.vscode/settings.json` overrides                     | Not in v1 (use global `~/.config/codemux/config.toml`)               |
 
 ---
 
@@ -56,6 +67,7 @@ Zed's extension API does **not** currently expose a "terminal profile" hook (unl
 - **Cross-platform** — macOS, Linux, Windows.
 
 ### Out of scope for v1
+
 - `kill` subcommand (use `tmux kill-session` / `zellij kill-session` directly) — deferred to v2.
 - Per-workspace `.codemux.toml` overrides — deferred to v2.
 - Pane / layout management.
@@ -117,11 +129,11 @@ auto_attach = true       # default true; same workspace ⇒ shared session
 
 ### Environment variables
 
-| Variable | Default | Description |
-|---|---|---|
-| `CODEMUX_MULTIPLEXER` | (auto-detect) | Force `tmux` or `zellij` |
-| `CODEMUX_AUTO_ATTACH` | `true` | If `false`, every window gets its own suffixed session |
-| `CODEMUX_DEBUG` | `0` | Set to `1` to print debug logs to stderr |
+| Variable              | Default       | Description                                            |
+| --------------------- | ------------- | ------------------------------------------------------ |
+| `CODEMUX_MULTIPLEXER` | (auto-detect) | Force `tmux` or `zellij`                               |
+| `CODEMUX_AUTO_ATTACH` | `true`        | If `false`, every window gets its own suffixed session |
+| `CODEMUX_DEBUG`       | `0`           | Set to `1` to print debug logs to stderr               |
 
 ---
 
@@ -134,31 +146,31 @@ Workspace name is derived from the basename of Zed's working directory, then san
 3. Strip leading and trailing `-`.
 4. If empty, fall back to literal `"session"`.
 
-| Input | Sanitized |
-|---|---|
+| Input          | Sanitized      |
+| -------------- | -------------- |
 | `My Workspace` | `My-Workspace` |
-| `my.project` | `my-project` |
-| `-myproject-` | `myproject` |
-| `...` | `session` |
+| `my.project`   | `my-project`   |
+| `-myproject-`  | `myproject`    |
+| `...`          | `session`      |
 
 When `auto_attach = false` (or a session with the bare name already exists and you opt out of attach), CodeMux finds the **first available** suffixed name starting at `-2`:
 
-| Existing sessions | Name assigned |
-|---|---|
-| `[]` | `myapp` |
-| `[myapp]` | `myapp-2` |
-| `[myapp, myapp-2]` | `myapp-3` |
+| Existing sessions           | Name assigned        |
+| --------------------------- | -------------------- |
+| `[]`                        | `myapp`              |
+| `[myapp]`                   | `myapp-2`            |
+| `[myapp, myapp-2]`          | `myapp-3`            |
 | `[myapp, myapp-2, myapp-5]` | `myapp-3` (gap-fill) |
 
 ---
 
 ## Multiplexer commands invoked
 
-| Mode | tmux | zellij |
-|---|---|---|
-| Auto-attach (default) | `tmux new-session -A -s <name> -c <cwd>` | `zellij attach <name> -c` |
-| Always-new | `tmux new-session -s <name> -c <cwd>` | `zellij -s <name>` |
-| List sessions | `tmux list-sessions -F '#{session_name}'` | `zellij list-sessions -n` |
+| Mode                  | tmux                                      | zellij                    |
+| --------------------- | ----------------------------------------- | ------------------------- |
+| Auto-attach (default) | `tmux new-session -A -s <name> -c <cwd>`  | `zellij attach <name> -c` |
+| Always-new            | `tmux new-session -s <name> -c <cwd>`     | `zellij -s <name>`        |
+| List sessions         | `tmux list-sessions -F '#{session_name}'` | `zellij list-sessions -n` |
 
 ---
 
@@ -195,10 +207,10 @@ When `auto_attach = false` (or a session with the bare name already exists and y
 
 See [`tasks/prd-zed-mux.md`](tasks/prd-zed-mux.md) for the full PRD and [`scripts/ralph/prd.json`](scripts/ralph/prd.json) for the Ralph task list driving autonomous implementation.
 
-| Version | Highlights |
-|---|---|
+| Version  | Highlights                                                                                                          |
+| -------- | ------------------------------------------------------------------------------------------------------------------- |
 | **v1.0** | Drop-in CLI binary, vscode-mux parity (sanitization + indexing + commands), companion Zed extension, cross-platform |
-| **v2.0** | `codemux kill <name>` subcommand; per-workspace `.codemux.toml` overrides |
+| **v2.0** | `codemux kill <name>` subcommand; per-workspace `.codemux.toml` overrides                                           |
 
 ---
 
