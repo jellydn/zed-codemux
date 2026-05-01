@@ -4,6 +4,7 @@
 - License: MIT with author 'jellydn' and year 2026
 - Pattern for testable env-dependent functions: create a `*_with_env` helper that takes `HashMap<String, String>` for injection
 - The `which` crate is already available for PATH probing (version 6.0)
+- Fallback shell pattern: print warning to stderr, then exec user's shell (Unix: $SHELL or /bin/sh, Windows: %COMSPEC% or cmd.exe)
 
 ## 2026-05-01 12:40 - US-001
 - What was implemented: Scaffolded the Rust binary crate with Cargo.toml, src/main.rs, .gitignore, and LICENSE
@@ -107,3 +108,14 @@
   - All 66 tests pass (including 14 new main module tests)
 ---
 
+
+## 2026-05-01 18:00 - US-010
+- What was implemented: Verified US-010 (Graceful fallback when no multiplexer) was already complete
+- Files changed: scripts/ralph/prd.json (marked US-010 passes: true)
+- **Learnings for future iterations:**
+  - The fallback shell implementation was already in place from US-009 work
+  - Warning message format: `codemux: tmux/zellij not found on PATH -- falling back to {shell}. Install tmux or zellij to enable multiplexer mode.`
+  - `decide_fallback_shell()` uses `#[cfg(unix)]` and `#[cfg(windows)]` for cross-platform shell selection
+  - Pattern: When testing env-dependent functions, use a helper that takes `HashMap<String, String>` for injection
+  - All 66 tests pass including 4 tests for `decide_fallback_shell` covering Unix/Windows env and default cases
+---

@@ -172,8 +172,8 @@
         "Tests pass"
       ],
       "priority": 10,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Fallback shell implementation complete with warning message, decide_fallback_shell helper, and unit tests"
     },
     {
       "id": "US-011",
