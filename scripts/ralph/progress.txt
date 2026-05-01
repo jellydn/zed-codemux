@@ -1,0 +1,24 @@
+## Codebase Patterns
+- This is a Rust project using Cargo for dependency management
+- Binary crate structure: Cargo.toml with [[bin]] target, src/main.rs as entry point
+- License: MIT with author 'jellydn' and year 2026
+
+## 2026-05-01 12:40 - US-001
+- What was implemented: Scaffolded the Rust binary crate with Cargo.toml, src/main.rs, .gitignore, and LICENSE
+- Files changed: Cargo.toml, src/main.rs, .gitignore, LICENSE
+- **Learnings for future iterations:**
+  - Project root is at /Users/huynhdung/src/tries/2026-05-01-zed-codemux, not scripts/ralph
+  - Use workdir parameter in bash tool to run commands from correct directory
+  - Dependencies needed: clap (derive feature), which, serde + serde_derive, toml, anyhow, dirs, regex
+  - Must use PREK_ALLOW_NO_CONFIG=1 for git commits due to pre-commit hook
+---
+
+## 2026-05-01 12:50 - US-002
+- What was implemented: Added session name sanitization module (src/sanitize.rs) that exactly matches vscode-mux algorithm
+- Files changed: src/sanitize.rs (new), src/main.rs (mod declaration)
+- **Learnings for future iterations:**
+  - Use `#[allow(dead_code)]` temporarily when functions are not yet used in main (clippy -D warnings requires this)
+  - Regex patterns needed for sanitization: `[^a-zA-Z0-9-]` for invalid chars, `\-{2,}` to collapse consecutive dashes, `^-+` and `-+$` for trimming
+  - All vscode-mux test fixtures pass: 'My Workspace' → 'My-Workspace', 'my.project' → 'my-project', etc.
+  - The algorithm: replace invalid chars with '-', collapse consecutive '-', strip leading/trailing '-', return 'session' if empty
+---

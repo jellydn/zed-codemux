@@ -1,0 +1,260 @@
+{
+  "project": "CodeMux for Zed",
+  "branchName": "ralph/zed-codemux",
+  "description": "Drop-in CLI binary (codemux) + companion Zed extension that opens Zed terminals inside tmux/zellij — port of vscode-mux to Zed. Mirrors vscode-mux session-naming and multi-window indexing exactly so the same workspace opened in VS Code and Zed lands in the same multiplexer session.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Scaffold the Rust binary crate",
+      "description": "As a developer, I need a working Rust crate so subsequent stories have a place to add code.",
+      "acceptanceCriteria": [
+        "Create Cargo.toml at repo root with package name 'codemux', edition 2021, [[bin]] target named 'codemux'",
+        "Add baseline dependencies in Cargo.toml: clap (with derive feature), which, serde + serde_derive, toml, anyhow",
+        "Create src/main.rs with a minimal entry point that prints 'codemux' and exits 0",
+        "Add .gitignore covering /target, Cargo.lock for binaries decision, .DS_Store",
+        "Add LICENSE file (MIT) at repo root with year 2026 and author 'jellydn'",
+        "`cargo build` succeeds",
+        "`cargo run -- --version` does not panic (a placeholder is fine for now)",
+        "Typecheck passes (cargo check passes)"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Implement session-name sanitization with vscode-mux fixture tests",
+      "description": "As the codemux binary, I need to convert any workspace name into a tmux/zellij-safe session name using the exact vscode-mux algorithm so cross-editor session sharing works.",
+      "acceptanceCriteria": [
+        "Add src/sanitize.rs (or module) with `pub fn sanitize_session_name(name: &str) -> String`",
+        "Algorithm exactly matches vscode-mux: replace any char not in [a-zA-Z0-9-] with '-', collapse consecutive '-' into one, strip leading/trailing '-', return literal 'session' if result is empty",
+        "Use the regex crate (add to Cargo.toml) or hand-rolled char iteration",
+        "Unit tests cover the vscode-mux fixture table: 'My Workspace' → 'My-Workspace', 'my.project' → 'my-project', 'my_project' → 'my-project', 'my...project' → 'my-project', '-myproject-' → 'myproject', '...' → 'session', '' → 'session'",
+        "All unit tests pass (`cargo test sanitize`)",
+        "Typecheck passes (cargo check passes)",
+        "Tests pass"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "Implement POSIX shell-escape helper with tests",
+      "description": "As the codemux binary, I need a shell-escape function (matching vscode-mux exactly) so session names and cwd values are safely interpolated when building shell commands.",
+      "acceptanceCriteria": [
+        "Add src/shell_escape.rs with `pub fn shell_escape(value: &str) -> String`",
+        "If input is empty, return literal `''`",
+        "Otherwise wrap in single quotes and replace internal `'` with `'\"'\"'` (POSIX single-quote escaping)",
+        "Unit tests: '' → \"''\", 'foo' → \"'foo'\", \"it's\" → \"'it'\\\"'\\\"'s'\", '/path with spaces' → \"'/path with spaces'\"",
+        "All unit tests pass (`cargo test shell_escape`)",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "Implement TOML config-file loader",
+      "description": "As the codemux binary, I need to read ~/.config/codemux/config.toml so users can persist multiplexer choice and auto_attach.",
+      "acceptanceCriteria": [
+        "Add src/config.rs with a `Config` struct: `multiplexer: Option<String>`, `auto_attach: Option<bool>`",
+        "Function `pub fn load_config() -> Config` reads `$XDG_CONFIG_HOME/codemux/config.toml` or `~/.config/codemux/config.toml` (Windows: `%APPDATA%/codemux/config.toml`)",
+        "Returns default `Config { multiplexer: None, auto_attach: None }` if file is missing or unreadable (no panic)",
+        "Use `dirs` crate for cross-platform config dir resolution (add to Cargo.toml)",
+        "Unit tests: parse a valid TOML string, parse an empty string (returns defaults), parse invalid TOML (returns defaults, does not panic)",
+        "Tests use a `parse_config_str(&str)` helper so they don't touch the filesystem",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "Implement multiplexer detection (env → config → PATH)",
+      "description": "As the codemux binary, I need to decide which multiplexer to use, in the priority order from the PRD.",
+      "acceptanceCriteria": [
+        "Add src/detect.rs with `pub enum Multiplexer { Tmux, Zellij }` and `pub fn detect_multiplexer(config: &Config) -> Option<Multiplexer>`",
+        "Resolution order: 1) env var `CODEMUX_MULTIPLEXER` ('tmux' | 'zellij'), 2) config.multiplexer field, 3) PATH probe via `which` crate — prefer 'tmux', then 'zellij'",
+        "Returns `None` only when none of the above resolves (PATH probe found nothing AND no override)",
+        "Unit tests inject env vars and config to verify resolution priority; a test for the PATH-probe path can be `#[ignore]` if it depends on host state",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-006",
+      "title": "Implement multiplexer launcher trait + tmux session listing",
+      "description": "As the codemux binary, I need an abstraction for multiplexer operations and a tmux implementation that can list live sessions.",
+      "acceptanceCriteria": [
+        "Add src/launcher.rs with `pub trait MuxLauncher { fn list_sessions(&self) -> anyhow::Result<Vec<String>>; fn build_command(&self, name: &str, cwd: &str, auto_attach: bool) -> String; }`",
+        "Add src/tmux.rs implementing `MuxLauncher` for `TmuxLauncher`",
+        "`list_sessions` runs `tmux list-sessions -F '#{session_name}'`, captures stdout, splits by newline, trims, filters empty lines",
+        "If tmux exits with non-zero status because no server is running, treat as empty session list (do not error)",
+        "`build_command` matches vscode-mux: auto-attach mode → `tmux new-session -A -s <escaped-name> -c <escaped-cwd>`; otherwise → `tmux new-session -s <escaped-name> -c <escaped-cwd>`",
+        "Unit test for `build_command` covers both auto-attach values; uses fixed name + cwd",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "Implement zellij launcher (list + build_command)",
+      "description": "As the codemux binary, I need a zellij implementation of MuxLauncher matching vscode-mux's exact commands.",
+      "acceptanceCriteria": [
+        "Add src/zellij.rs implementing `MuxLauncher` for `ZellijLauncher`",
+        "`list_sessions` runs `zellij list-sessions -n`, captures stdout, splits/trims, filters empty",
+        "If zellij exits non-zero because no sessions exist, return empty list (do not error)",
+        "`build_command`: auto-attach → `zellij attach <escaped-name> -c`; otherwise → `zellij -s <escaped-name>` (NO -c <cwd> in either form — matches vscode-mux behavior)",
+        "Unit tests for `build_command` cover both auto-attach values",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-008",
+      "title": "Implement getUniqueSessionName with gap-filling",
+      "description": "As the codemux binary, I need to compute a unique suffixed session name using the exact vscode-mux algorithm so multi-window scenarios behave identically across editors.",
+      "acceptanceCriteria": [
+        "Add `pub fn get_unique_session_name(base: &str, sessions: &[String]) -> String` (pure function — takes the session list as input so it is trivially testable)",
+        "If `base` is not in `sessions`, return `base` unchanged",
+        "Otherwise start `suffix = 2`; while `format!(\"{base}-{suffix}\")` is in `sessions`, `suffix += 1`; return `format!(\"{base}-{suffix}\")`",
+        "Unit tests cover the PRD table: [] → 'myapp', ['myapp'] → 'myapp-2', ['myapp','myapp-2'] → 'myapp-3', ['myapp','myapp-2','myapp-5'] → 'myapp-3' (gap-fill)",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-009",
+      "title": "Wire main entry point: detect, name, dispatch",
+      "description": "As a Zed user, I want `codemux` to detect the multiplexer, compute a session name from CWD, and exec into the multiplexer command.",
+      "acceptanceCriteria": [
+        "src/main.rs reads CWD via `std::env::current_dir()`, computes basename → `sanitize_session_name`",
+        "Loads config (US-004), detects multiplexer (US-005)",
+        "Resolves auto_attach: env `CODEMUX_AUTO_ATTACH` ('true'|'false') overrides config.auto_attach overrides default `true`",
+        "If auto_attach is true and base name already exists in `list_sessions`, use base name; otherwise call `get_unique_session_name` to pick a new name",
+        "Builds command string via launcher's `build_command`, then `exec`s it via `$SHELL -l -c <command>` on Unix (using `std::os::unix::process::CommandExt::exec`), or spawn+wait on Windows",
+        "On Windows, use `cmd.exe /C <command>` (or PowerShell if `$SHELL` is set) and propagate the child exit code",
+        "Manual smoke test: running `codemux` in a directory called `test-proj` while tmux is installed lands in a tmux session named `test-proj` (document this in NOTES file or PR description)",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-010",
+      "title": "Graceful fallback when no multiplexer is installed",
+      "description": "As a user without tmux/zellij, I want codemux to still give me a usable terminal with one helpful warning.",
+      "acceptanceCriteria": [
+        "When `detect_multiplexer` returns `None`, print a single-line warning to stderr: `codemux: tmux/zellij not found on PATH — falling back to $SHELL. Install tmux or zellij to enable multiplexer mode.`",
+        "Exec the user's default shell: Unix → `$SHELL` env var, fallback `/bin/sh`; Windows → `%COMSPEC%`, fallback `cmd.exe`",
+        "Process is replaced via `exec` on Unix; on Windows spawn+wait and propagate exit code",
+        "Unit test (or integration test) verifies the warning string and the chosen shell path given a mocked env (use a small `decide_fallback_shell()` helper that takes env as input)",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-011",
+      "title": "Add CLI flags: --version, --help, CODEMUX_DEBUG logging",
+      "description": "As a user, I want standard CLI ergonomics and an opt-in debug mode for troubleshooting.",
+      "acceptanceCriteria": [
+        "Use `clap` derive API to define a `Cli` struct with `--version` and `--help` (auto-generated)",
+        "All other args are forwarded as-is to the spawned shell command (do not error on unknown args)",
+        "When env `CODEMUX_DEBUG=1` is set, log the resolved multiplexer, base name, sanitized name, final session name, and full command to stderr — prefix each line with `[codemux] `",
+        "When `CODEMUX_DEBUG` is unset or anything other than `1`, no debug output",
+        "Unit test for the debug-decision helper (`fn debug_enabled(env: &HashMap<String,String>) -> bool`)",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-012",
+      "title": "Add GitHub Actions CI workflow",
+      "description": "As a maintainer, I want CI to verify build, lint, format, and tests on macOS, Linux, and Windows.",
+      "acceptanceCriteria": [
+        "Create `.github/workflows/ci.yml` with a job matrix: `os: [ubuntu-latest, macos-latest, windows-latest]`",
+        "Job runs: checkout, setup-rust (stable + clippy + rustfmt), `cargo build --release`, `cargo test`, `cargo clippy -- -D warnings`, `cargo fmt --check`",
+        "Cache cargo registry + target dir across runs (use `Swatinem/rust-cache` action)",
+        "Workflow runs on push to main and pull_request",
+        "Verify locally: `cargo build --release && cargo test && cargo clippy -- -D warnings && cargo fmt --check` all succeed",
+        "Typecheck passes"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-013",
+      "title": "Add release workflow producing cross-platform binaries",
+      "description": "As a user, I want prebuilt binaries downloadable from GitHub Releases so I don't have to install Rust.",
+      "acceptanceCriteria": [
+        "Create `.github/workflows/release.yml` triggered on tag push matching `v*`",
+        "Build matrix produces: macos-x64, macos-arm64, linux-x64, linux-arm64, windows-x64",
+        "Each artifact is a tar.gz (or .zip on Windows) named `codemux-<version>-<target>.{tar.gz,zip}` containing the `codemux` binary",
+        "Workflow creates a GitHub Release with `softprops/action-gh-release` and attaches all artifacts",
+        "Workflow lints OK with `actionlint` (or at minimum `yamllint` passes)",
+        "Typecheck passes"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-014",
+      "title": "Add Zed companion extension manifest + license",
+      "description": "As a Zed user, I want CodeMux to be installable from Zed's extension registry so I can discover it the standard way.",
+      "acceptanceCriteria": [
+        "Create `extension.toml` at repo root with: id='codemux', name='CodeMux', version='0.1.0', schema_version=1, authors=['jellydn'], description='Open Zed terminals inside tmux or zellij — port of vscode-mux to Zed.', repository='https://github.com/jellydn/zed-codemux'",
+        "License file at repo root is named `LICENSE` and contains an accepted Zed license (MIT) — already present from US-001 but verify",
+        "Do NOT bundle the `codemux` binary in the extension package (per Zed policy)",
+        "README has an explicit section on installing the binary alongside the extension",
+        "Add `tasks/zed-extension-submission.md` with a step-by-step description of how to fork zed-industries/extensions, add the new entry, and open the PR (this story does not actually open the PR)",
+        "Typecheck passes (cargo check still succeeds)"
+      ],
+      "priority": 14,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-015",
+      "title": "Polish README and add usage GIF placeholder",
+      "description": "As a new user, I want a README that walks me through install → configure → first terminal.",
+      "acceptanceCriteria": [
+        "Verify README.md at repo root covers: Why → Features → Install (binary + extension) → Configure (settings.json snippet) → Configuration (env + config.toml) → Session naming table → Multiplexer commands table → Requirements → Roadmap → Credits → License",
+        "Add an `assets/` folder containing a placeholder `demo.gif` (1×1 transparent PNG renamed is fine if no real GIF yet) and reference it from the README's Why section",
+        "Add a 'Differences from vscode-mux' subsection enumerating: no Zed extension API for terminal profiles → CLI binary approach; no `kill` subcommand in v1; no per-workspace config in v1",
+        "Add a 'Compared to vscode-mux' link block at the top of the README",
+        "Markdown lints OK (`markdownlint-cli` or eyeball check — no broken links)",
+        "Typecheck passes"
+      ],
+      "priority": 15,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}
