@@ -1,0 +1,17 @@
+# Rust build artifacts
+/target
+
+# Cargo lock file for binary crates
+Cargo.lock
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Test artifacts
+*.log

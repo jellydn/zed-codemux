@@ -31,3 +31,14 @@
   - Pattern for unused functions: add `#[allow(dead_code)]` to satisfy clippy -D warnings
   - Test coverage: empty string, simple strings, strings with single quotes, paths with spaces
 ---
+
+## 2026-05-01 14:15 - US-004
+- What was implemented: Added TOML config-file loader (src/config.rs) with `Config` struct and `load_config()` function
+- Files changed: src/config.rs (new), src/main.rs (mod declaration)
+- **Learnings for future iterations:**
+  - Use `dirs` crate for cross-platform config dir resolution (Windows: %APPDATA%, macOS/Linux: ~/.config)
+  - Support $XDG_CONFIG_HOME environment variable as first priority
+  - Pattern: `parse_config_str()` helper for testable TOML parsing without filesystem
+  - Use `toml::from_str().unwrap_or_default()` for graceful fallback on invalid config
+  - Serde derive macros work great for simple config structs with optional fields
+---
