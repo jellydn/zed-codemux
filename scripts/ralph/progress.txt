@@ -68,3 +68,15 @@
   - Tmux commands: `tmux new-session -A -s <name>` attaches to existing or creates new; `-c <cwd>` sets working directory
 ---
 
+## 2026-05-01 16:00 - US-007
+- What was implemented: Added zellij launcher implementation (src/zellij.rs) following the same pattern as tmux.rs
+- Files changed: src/zellij.rs (new), src/main.rs (added mod zellij), scripts/ralph/prd.json (updated US-007 passes: true)
+- **Learnings for future iterations:**
+  - Zellij differs from tmux: NO -c option for cwd in either auto-attach or new session mode (per vscode-mux behavior)
+  - Zellij auto-attach command: `zellij attach <name> -c` (the -c creates session if not exists)
+  - Zellij new session command: `zellij -s <name>` (simple session creation)
+  - `zellij list-sessions -n` outputs just session names (similar to tmux format)
+  - Both zellij and tmux follow the same error handling pattern: return empty Vec on non-zero exit
+  - Copying the tmux.rs structure and adapting the command strings is the fastest approach
+---
+
