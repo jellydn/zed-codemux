@@ -32,9 +32,93 @@ pub fn sanitize_session_name(name: &str) -> String {
     }
 }
 
+/// Computes a unique session name with gap-filling (matches vscode-mux exactly).
+/// If base is not in sessions, returns base unchanged.
+/// Otherwise starts at suffix=2 and finds the first available gap.
+/// Example: sessions=['myapp','myapp-2','myapp-5'] → returns 'myapp-3'
+#[allow(dead_code)]
+pub fn get_unique_session_name(base: &str, sessions: &[String]) -> String {
+    let sessions_set: std::collections::HashSet<&str> =
+        sessions.iter().map(|s| s.as_str()).collect();
+
+    if !sessions_set.contains(base) {
+        return base.to_string();
+    }
+
+    let mut suffix = 2;
+    loop {
+        let candidate = format!("{base}-{suffix}");
+        if !sessions_set.contains(candidate.as_str()) {
+            return candidate;
+        }
+        suffix += 1;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_unique_empty_list() {
+        assert_eq!(get_unique_session_name("myapp", &[]), "myapp");
+    }
+
+    #[test]
+    fn test_unique_base_not_in_list() {
+        assert_eq!(
+            get_unique_session_name("myapp", &["other".to_string()]),
+            "myapp"
+        );
+    }
+
+    #[test]
+    fn test_unique_base_exists() {
+        assert_eq!(
+            get_unique_session_name("myapp", &["myapp".to_string()]),
+            "myapp-2"
+        );
+    }
+
+    #[test]
+    fn test_unique_base_and_2_exist() {
+        assert_eq!(
+            get_unique_session_name("myapp", &["myapp".to_string(), "myapp-2".to_string()]),
+            "myapp-3"
+        );
+    }
+
+    #[test]
+    fn test_unique_gap_filling() {
+        // Gap-filling: finds myapp-3 before myapp-5
+        assert_eq!(
+            get_unique_session_name(
+                "myapp",
+                &[
+                    "myapp".to_string(),
+                    "myapp-2".to_string(),
+                    "myapp-5".to_string()
+                ]
+            ),
+            "myapp-3"
+        );
+    }
+
+    #[test]
+    fn test_unique_large_gap() {
+        assert_eq!(
+            get_unique_session_name(
+                "myapp",
+                &[
+                    "myapp".to_string(),
+                    "myapp-2".to_string(),
+                    "myapp-3".to_string(),
+                    "myapp-5".to_string()
+                ]
+            ),
+            "myapp-4"
+        );
+    }
 
     #[test]
     fn test_my_workspace() {
