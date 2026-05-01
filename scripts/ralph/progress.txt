@@ -157,8 +157,20 @@
   - Artifact naming: `codemux-{version}-macos-{arch}.tar.gz`, `codemux-{version}-linux-{arch}.tar.gz`, `codemux-{version}-windows-x64.zip`
   - Cross-compilation for Linux ARM64 requires `gcc-aarch64-linux-gnu` package and `CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER` env var
   - Uses `softprops/action-gh-release@v2` to create GitHub Release and attach all artifacts
-  - Uses `actions/upload-artifact@v4` and `actions/download-artifact@v4` for artifact passing between jobs
-  - Two-stage workflow: build-and-release job (matrix) → create-release job (collects artifacts)
-  - YAML linting: yamllint passes (only truthy warning on `on:` which is standard for GitHub Actions)
-  - All 71 tests pass, clippy clean, formatting correct, build succeeds
+- Uses `actions/upload-artifact@v4` and `actions/download-artifact@v4` for artifact passing between jobs
+- Two-stage workflow: build-and-release job (matrix) → create-release job (collects artifacts)
+- YAML linting: yamllint passes (only truthy warning on `on:` which is standard for GitHub Actions)
+- All 71 tests pass, clippy clean, formatting correct, build succeeds
+---
+
+## 2026-05-01 21:00 - US-014
+- What was implemented: Added Zed companion extension manifest and submission guide
+- Files changed: extension.toml (new), tasks/zed-extension-submission.md (new)
+- **Learnings for future iterations:**
+  - Zed extension manifest format (extension.toml): id, name, version, schema_version=1, authors[], description, repository
+  - Do NOT bundle the binary in the extension per Zed policy — extension is for discoverability only
+  - README already had the "Install the binary alongside the extension" section
+  - LICENSE was already present (MIT) from US-001, verified it's correct for Zed
+  - Submission guide should include: fork → create entry → update extensions.toml → PR → wait for review
+  - 71 tests pass, clippy clean, formatting correct
 ---
