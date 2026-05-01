@@ -147,3 +147,18 @@
   - All quality checks verified locally before committing
   - 71 tests pass, clippy clean, formatting correct
 ---
+
+## 2026-05-01 20:25 - US-013
+- What was implemented: Added GitHub Actions release workflow (`.github/workflows/release.yml`) producing cross-platform binaries
+- Files changed: `.github/workflows/release.yml` (new)
+- **Learnings for future iterations:**
+  - Release workflow triggered on tag push matching `v*` pattern
+  - Build matrix includes 5 targets: macos-x64, macos-arm64, linux-x64, linux-arm64, windows-x64
+  - Artifact naming: `codemux-{version}-macos-{arch}.tar.gz`, `codemux-{version}-linux-{arch}.tar.gz`, `codemux-{version}-windows-x64.zip`
+  - Cross-compilation for Linux ARM64 requires `gcc-aarch64-linux-gnu` package and `CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER` env var
+  - Uses `softprops/action-gh-release@v2` to create GitHub Release and attach all artifacts
+  - Uses `actions/upload-artifact@v4` and `actions/download-artifact@v4` for artifact passing between jobs
+  - Two-stage workflow: build-and-release job (matrix) → create-release job (collects artifacts)
+  - YAML linting: yamllint passes (only truthy warning on `on:` which is standard for GitHub Actions)
+  - All 71 tests pass, clippy clean, formatting correct, build succeeds
+---

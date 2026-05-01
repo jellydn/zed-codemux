@@ -1,0 +1,119 @@
+---
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build and Release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            arch: x64
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            arch: arm64
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            arch: x64
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            arch: arm64
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            arch: x64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Install cross-compilation tools (Linux ARM64)
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        env:
+          LINKER: aarch64-linux-gnu-gcc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+          {
+            echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=${LINKER}"
+          } >> "$GITHUB_ENV"
+
+      - name: Build release binary
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Package binary (Unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          mkdir -p dist
+          if [ "${{ matrix.os }}" = "macos-latest" ]; then
+            TARGET_NAME="codemux-${VERSION}-macos-${{ matrix.arch }}"
+          else
+            TARGET_NAME="codemux-${VERSION}-linux-${{ matrix.arch }}"
+          fi
+          cp target/${{ matrix.target }}/release/codemux dist/codemux
+          chmod +x dist/codemux
+          tar -czf "${TARGET_NAME}.tar.gz" -C dist codemux
+          echo "ASSET_NAME=${TARGET_NAME}.tar.gz" >> $GITHUB_ENV
+
+      - name: Package binary (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          $VERSION = $env:GITHUB_REF_NAME -replace '^v', ''
+          $TARGET_NAME = "codemux-$VERSION-windows-${{ matrix.arch }}"
+          New-Item -ItemType Directory -Force -Path dist
+          Copy-Item "target/${{ matrix.target }}/release/codemux.exe" \
+            -Destination "dist/codemux.exe"
+          Compress-Archive -Path "dist/codemux.exe" \
+            -DestinationPath "${TARGET_NAME}.zip"
+          $envLine = "ASSET_NAME=${TARGET_NAME}.zip"
+          $envLine | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ASSET_NAME }}
+          path: ${{ env.ASSET_NAME }}
+
+  create-release:
+    name: Create GitHub Release
+    needs: build-and-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

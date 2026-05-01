@@ -221,8 +221,8 @@
         "Typecheck passes"
       ],
       "priority": 13,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Release workflow created with 5-target build matrix. Uses actions/checkout@v4, dtolnay/rust-toolchain@stable, Swatinem/rust-cache@v2, actions/upload-artifact@v4, softprops/action-gh-release@v2. Artifacts: codemux-{version}-macos-x64.tar.gz, codemux-{version}-macos-arm64.tar.gz, codemux-{version}-linux-x64.tar.gz, codemux-{version}-linux-arm64.tar.gz, codemux-{version}-windows-x64.zip"
     },
     {
       "id": "US-014",
