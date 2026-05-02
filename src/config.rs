@@ -21,9 +21,58 @@ pub fn load_config() -> Config {
     }
 }
 
+/// Gets the platform-specific config directory.
+fn platform_config_dir() -> Option<PathBuf> {
+    // Check $XDG_CONFIG_HOME first (Linux/macOS standard)
+    if let Ok(xdg_config) = std::env::var("XDG_CONFIG_HOME") {
+        return Some(PathBuf::from(xdg_config));
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        // macOS: ~/Library/Application Support
+        if let Ok(home) = std::env::var("HOME") {
+            let mut path = PathBuf::from(home);
+            path.push("Library");
+            path.push("Application Support");
+            return Some(path);
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        // Linux: ~/.config
+        if let Ok(home) = std::env::var("HOME") {
+            let mut path = PathBuf::from(home);
+            path.push(".config");
+            return Some(path);
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        // Windows: %APPDATA%
+        if let Ok(appdata) = std::env::var("APPDATA") {
+            return Some(PathBuf::from(appdata));
+        }
+    }
+
+    // Fallback for other Unix systems
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        if let Ok(home) = std::env::var("HOME") {
+            let mut path = PathBuf::from(home);
+            path.push(".config");
+            return Some(path);
+        }
+    }
+
+    None
+}
+
 /// Gets the platform-specific config file path.
 fn get_config_path() -> PathBuf {
-    // Check $XDG_CONFIG_HOME first, then fall back to dirs::config_dir()
+    // Check $XDG_CONFIG_HOME first, then fall back to platform-specific config dir
     if let Ok(xdg_config) = std::env::var("XDG_CONFIG_HOME") {
         let mut path = PathBuf::from(xdg_config);
         path.push("codemux");
@@ -31,8 +80,8 @@ fn get_config_path() -> PathBuf {
         return path;
     }
 
-    // Use dirs crate for cross-platform config dir
-    if let Some(config_dir) = dirs::config_dir() {
+    // Use platform-specific config dir
+    if let Some(config_dir) = platform_config_dir() {
         let mut path = config_dir;
         path.push("codemux");
         path.push("config.toml");
