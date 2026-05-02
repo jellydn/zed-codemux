@@ -1,8 +1,15 @@
+/// Maximum session name length to avoid zellij IPC socket path limit.
+/// Zellij has a 103-byte limit for Unix domain socket paths.
+/// On macOS, TMPDIR can be ~49 chars + zellij path ~31 chars = ~80 chars prefix.
+/// 32 chars leaves headroom for the session name while staying under the limit.
+const MAX_SESSION_NAME_LENGTH: usize = 32;
+
 /// Sanitizes a workspace name into a tmux/zellij-safe session name.
-/// Matches the exact vscode-mux algorithm:
+/// Matches the exact vscode-mux algorithm with added length limit for zellij compatibility:
 /// - Replace any char not in [a-zA-Z0-9-] with '-'
 /// - Collapse consecutive '-' into one
 /// - Strip leading/trailing '-'
+/// - Truncate to MAX_SESSION_NAME_LENGTH to avoid zellij socket path limits
 /// - Return 'session' if result is empty
 #[inline]
 pub fn sanitize_session_name(name: &str) -> String {
@@ -48,10 +55,17 @@ pub fn sanitize_session_name(name: &str) -> String {
 
     // Step 5: Return 'session' if result is empty
     if result.is_empty() {
-        "session".to_string()
-    } else {
-        result.into_iter().collect()
+        return "session".to_string();
     }
+
+    // Step 6: Truncate to max length to avoid zellij IPC socket path limits
+    let mut result: String = result.into_iter().collect();
+    if result.len() > MAX_SESSION_NAME_LENGTH {
+        // Truncate from the end to preserve the beginning of the name
+        result.truncate(MAX_SESSION_NAME_LENGTH);
+    }
+
+    result
 }
 
 /// Computes a unique session name with gap-filling (matches vscode-mux exactly).
@@ -216,11 +230,11 @@ mod tests {
 
     #[test]
     fn test_very_long_name() {
-        // Very long names should still work
+        // Very long names should be truncated to MAX_SESSION_NAME_LENGTH
         let long_name = "a".repeat(1000);
         let result = sanitize_session_name(&long_name);
-        assert_eq!(result.len(), 1000);
-        assert_eq!(result, long_name);
+        assert_eq!(result.len(), 32);
+        assert_eq!(result, "a".repeat(32));
     }
 
     #[test]
@@ -278,5 +292,50 @@ mod tests {
         // Test collision with names that look like our suffixes
         let sessions = vec!["myapp".to_string(), "myapp-2".to_string()];
         assert_eq!(get_unique_session_name("myapp-2", &sessions), "myapp-2-2");
+    }
+
+    #[test]
+    fn test_truncate_long_name() {
+        // Long names should be truncated to MAX_SESSION_NAME_LENGTH (32)
+        let long_name = "a".repeat(50);
+        let result = sanitize_session_name(&long_name);
+        assert_eq!(result.len(), 32);
+        assert_eq!(result, "a".repeat(32));
+    }
+
+    #[test]
+    fn test_truncate_preserves_beginning() {
+        // Truncation should preserve the beginning of the name
+        let name = "my-very-long-project-name-that-exceeds-limits";
+        let result = sanitize_session_name(name);
+        assert!(result.len() <= 32);
+        assert!(result.starts_with("my-very-long-project-name"));
+    }
+
+    #[test]
+    fn test_truncate_after_sanitization() {
+        // Special chars should be sanitized first, then truncation applied
+        let name = "my.project.name.with.many.dots.that.is.very.long";
+        let result = sanitize_session_name(name);
+        assert!(result.len() <= 32);
+        assert_eq!(result, "my-project-name-with-many-dots-t");
+    }
+
+    #[test]
+    fn test_exactly_max_length_unchanged() {
+        // Names exactly at the limit should not be truncated
+        let name = "a".repeat(32);
+        let result = sanitize_session_name(&name);
+        assert_eq!(result, name);
+        assert_eq!(result.len(), 32);
+    }
+
+    #[test]
+    fn test_one_over_max_length_truncated() {
+        // Names one char over the limit should be truncated
+        let name = "a".repeat(33);
+        let result = sanitize_session_name(&name);
+        assert_eq!(result.len(), 32);
+        assert_eq!(result, "a".repeat(32));
     }
 }
