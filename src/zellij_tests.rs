@@ -6,7 +6,13 @@ fn test_build_command_auto_attach_true() {
     let launcher = ZellijLauncher::new();
     let cmd = launcher.build_command("myapp", "/home/user/projects/myapp", true);
     let socket_dir = get_socket_dir();
-    assert_eq!(cmd, format!("ZELLIJ_SOCKET_DIR='{}' zellij attach 'myapp' -c", socket_dir));
+    assert_eq!(
+        cmd,
+        format!(
+            "ZELLIJ_SOCKET_DIR='{}' zellij attach 'myapp' -c",
+            socket_dir
+        )
+    );
 }
 
 #[test]
@@ -14,7 +20,10 @@ fn test_build_command_auto_attach_false() {
     let launcher = ZellijLauncher::new();
     let cmd = launcher.build_command("myapp", "/home/user/projects/myapp", false);
     let socket_dir = get_socket_dir();
-    assert_eq!(cmd, format!("ZELLIJ_SOCKET_DIR='{}' zellij -s 'myapp'", socket_dir));
+    assert_eq!(
+        cmd,
+        format!("ZELLIJ_SOCKET_DIR='{}' zellij -s 'myapp'", socket_dir)
+    );
 }
 
 #[test]
@@ -22,7 +31,13 @@ fn test_build_command_with_spaces_in_name() {
     let launcher = ZellijLauncher::new();
     let cmd = launcher.build_command("my app", "/home/user/my projects", true);
     let socket_dir = get_socket_dir();
-    assert_eq!(cmd, format!("ZELLIJ_SOCKET_DIR='{}' zellij attach 'my app' -c", socket_dir));
+    assert_eq!(
+        cmd,
+        format!(
+            "ZELLIJ_SOCKET_DIR='{}' zellij attach 'my app' -c",
+            socket_dir
+        )
+    );
 }
 
 #[test]
@@ -30,7 +45,10 @@ fn test_build_command_with_quotes() {
     let launcher = ZellijLauncher::new();
     let cmd = launcher.build_command("it's", "/home/user/john's files", false);
     let socket_dir = get_socket_dir();
-    assert_eq!(cmd, format!("ZELLIJ_SOCKET_DIR='{}' zellij -s 'it'\"'\"'s'", socket_dir));
+    assert_eq!(
+        cmd,
+        format!("ZELLIJ_SOCKET_DIR='{}' zellij -s 'it'\"'\"'s'", socket_dir)
+    );
 }
 
 #[test]

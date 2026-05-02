@@ -318,3 +318,19 @@ fn run_fallback_shell(env: &HashMap<String, String>) -> io::Result<()> {
 
 #[cfg(test)]
 mod main_tests;
+
+#[cfg(test)]
+#[path = "config_tests.rs"]
+mod config_tests;
+#[cfg(test)]
+#[path = "detect_tests.rs"]
+mod detect_tests;
+#[cfg(test)]
+#[path = "sanitize_tests.rs"]
+mod sanitize_tests;
+#[cfg(test)]
+#[path = "tmux_tests.rs"]
+mod tmux_tests;
+#[cfg(test)]
+#[path = "zellij_tests.rs"]
+mod zellij_tests;
