@@ -1,8 +1,7 @@
 # Rust build artifacts
 /target
 
-# Cargo lock file for binary crates
-Cargo.lock
+# Cargo.lock is kept for binary crates to ensure reproducible builds
 
 # macOS
 .DS_Store
