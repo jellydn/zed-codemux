@@ -1,5 +1,6 @@
 # Rust build artifacts
 /target
+extension/target
 
 # Cargo lock file for binary crates
 Cargo.lock

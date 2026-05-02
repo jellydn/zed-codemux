@@ -1,8 +1,7 @@
-use serde::Deserialize;
 use std::path::PathBuf;
 
 /// Configuration for codemux, loaded from `~/.config/codemux/config.toml` (or platform equivalent).
-#[derive(Debug, Deserialize, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq)]
 pub struct Config {
     /// Preferred multiplexer: "tmux" or "zellij"
     pub multiplexer: Option<String>,
@@ -92,11 +91,46 @@ fn get_config_path() -> PathBuf {
     PathBuf::from("config.toml")
 }
 
-/// Parses a TOML config string into a Config struct.
+/// Parses a minimal TOML config string for our specific format.
+/// Only supports:
+///   multiplexer = "value"
+///   auto_attach = true/false
 /// Returns defaults if parsing fails.
 #[allow(dead_code)]
 pub fn parse_config_str(contents: &str) -> Config {
-    toml::from_str(contents).unwrap_or_default()
+    let mut config = Config::default();
+
+    for line in contents.lines() {
+        let line = line.trim();
+
+        // Skip empty lines and comments
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+
+        // Parse key = "value" or key = true/false
+        if let Some(eq_pos) = line.find('=') {
+            let key = line[..eq_pos].trim();
+            let value = line[eq_pos + 1..].trim();
+
+            match key {
+                "multiplexer" => {
+                    // Extract string value (handles "value" or 'value')
+                    let cleaned = value.trim_matches('"').trim_matches('\'');
+                    if !cleaned.is_empty() {
+                        config.multiplexer = Some(cleaned.to_string());
+                    }
+                }
+                "auto_attach" => {
+                    // Parse boolean
+                    config.auto_attach = Some(value == "true" || value == "yes" || value == "1");
+                }
+                _ => {} // Unknown keys are ignored
+            }
+        }
+    }
+
+    config
 }
 
 #[cfg(test)]
@@ -167,5 +201,61 @@ unknown_field = "ignored"
         let config = parse_config_str(toml);
         assert_eq!(config.multiplexer, Some("tmux".to_string()));
         assert_eq!(config.auto_attach, Some(true));
+    }
+
+    #[test]
+    fn test_parse_with_comments() {
+        let toml = r#"
+# This is a comment
+multiplexer = "tmux"
+# Another comment
+auto_attach = true
+"#;
+        let config = parse_config_str(toml);
+        assert_eq!(config.multiplexer, Some("tmux".to_string()));
+        assert_eq!(config.auto_attach, Some(true));
+    }
+
+    #[test]
+    fn test_parse_with_whitespace() {
+        let toml = r#"
+  multiplexer   =   "zellij"  
+  auto_attach   =   false  
+"#;
+        let config = parse_config_str(toml);
+        assert_eq!(config.multiplexer, Some("zellij".to_string()));
+        assert_eq!(config.auto_attach, Some(false));
+    }
+
+    #[test]
+    fn test_parse_single_quotes() {
+        let toml = r#"multiplexer = 'tmux'"#;
+        let config = parse_config_str(toml);
+        assert_eq!(config.multiplexer, Some("tmux".to_string()));
+    }
+
+    #[test]
+    fn test_parse_auto_attach_variations() {
+        // Test true variations
+        assert_eq!(
+            parse_config_str("auto_attach = true").auto_attach,
+            Some(true)
+        );
+        assert_eq!(
+            parse_config_str("auto_attach = yes").auto_attach,
+            Some(true)
+        );
+        assert_eq!(parse_config_str("auto_attach = 1").auto_attach, Some(true));
+
+        // Test false variations
+        assert_eq!(
+            parse_config_str("auto_attach = false").auto_attach,
+            Some(false)
+        );
+        assert_eq!(
+            parse_config_str("auto_attach = no").auto_attach,
+            Some(false)
+        );
+        assert_eq!(parse_config_str("auto_attach = 0").auto_attach, Some(false));
     }
 }

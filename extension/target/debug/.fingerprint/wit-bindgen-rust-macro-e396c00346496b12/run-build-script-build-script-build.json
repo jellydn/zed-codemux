@@ -1,1 +1,0 @@
-{"rustc":2179919275645516985,"features":"","declared_features":"","target":0,"profile":0,"path":0,"deps":[[10650163351879981428,"build_script_build",false,5860221704777852584]],"local":[{"RerunIfChanged":{"output":"debug/build/wit-bindgen-rust-macro-e396c00346496b12/output","paths":["build.rs"]}}],"rustflags":[],"config":0,"compile_kind":0}
