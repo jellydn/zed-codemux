@@ -32,3 +32,4 @@ strip = true
 panic = "abort"
 codegen-units = 1
 overflow-checks = false
+
