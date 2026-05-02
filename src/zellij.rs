@@ -3,10 +3,10 @@ use std::io::{Error, ErrorKind};
 use std::process::Command;
 
 /// Returns the socket directory for zellij, using ZELLIJ_SOCKET_DIR if set,
-/// otherwise defaulting to /tmp/zellij to avoid long TMPDIR paths on macOS.
+/// otherwise defaulting to /tmp/z to avoid long TMPDIR paths on macOS.
 /// The zellij IPC socket has a 103-byte limit, and macOS TMPDIR can be ~50 chars.
 pub(crate) fn get_socket_dir() -> String {
-    std::env::var("ZELLIJ_SOCKET_DIR").unwrap_or_else(|_| "/z".to_string())
+    std::env::var("ZELLIJ_SOCKET_DIR").unwrap_or_else(|_| "/tmp/z".to_string())
 }
 
 /// Zellij multiplexer launcher
