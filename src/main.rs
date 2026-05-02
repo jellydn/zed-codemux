@@ -516,4 +516,59 @@ mod tests {
         assert_eq!(shell_escape("`echo hi`"), "'`echo hi`'");
         assert_eq!(shell_escape("back\\slash"), "'back\\slash'");
     }
+
+    // Security tests for shell injection prevention
+
+    #[test]
+    fn test_shell_escape_prevents_command_injection() {
+        // Attempt to break out of single quotes and execute commands
+        // Input: '; rm -rf /; ' should become: ''\'''; rm -rf /; '\'''
+        let malicious = "'; rm -rf /; '";
+        let escaped = shell_escape(malicious);
+        // Verify the escaped string cannot break out of quotes
+        assert!(escaped.contains("'\"'\"'"));
+        assert_ne!(escaped, "'; rm -rf /; '");
+    }
+
+    #[test]
+    fn test_shell_escape_prevents_variable_expansion() {
+        // $() command substitution
+        let malicious = "$(rm -rf /)";
+        let escaped = shell_escape(malicious);
+        assert_eq!(escaped, "'$(rm -rf /)'");
+
+        // Backtick command substitution
+        let malicious2 = "`rm -rf /`";
+        let escaped2 = shell_escape(malicious2);
+        assert_eq!(escaped2, "'`rm -rf /`'");
+    }
+
+    #[test]
+    fn test_shell_escape_null_bytes() {
+        // Null bytes in session names
+        let with_null = "test\x00name";
+        let escaped = shell_escape(with_null);
+        assert!(escaped.contains("\x00"));
+        // The null byte should be preserved in the escaped string
+    }
+
+    #[test]
+    fn test_shell_escape_control_characters() {
+        // Various control characters
+        let with_tab = "test\tname";
+        let escaped = shell_escape(with_tab);
+        assert!(escaped.contains("\t"));
+
+        let with_newline = "test\nname";
+        let escaped = shell_escape(with_newline);
+        assert!(escaped.contains("\n"));
+    }
+
+    #[test]
+    fn test_shell_escape_multiple_quotes() {
+        // Multiple single quotes in various positions
+        assert_eq!(shell_escape("'"), "''\"'\"''");
+        assert_eq!(shell_escape("''"), "''\"'\"''\"'\"''");
+        assert_eq!(shell_escape("a'b'c"), "'a'\"'\"'b'\"'\"'c'");
+    }
 }
