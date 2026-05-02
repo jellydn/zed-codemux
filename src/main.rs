@@ -25,6 +25,7 @@ pub trait MuxLauncher {
 
 /// POSIX shell escape: wraps input in single quotes, replacing internal `'` with `'"'"'`.
 /// If input is empty, returns `''`.
+#[inline]
 pub fn shell_escape(value: &str) -> String {
     if value.is_empty() {
         return "''".to_string();

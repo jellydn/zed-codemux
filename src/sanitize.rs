@@ -4,7 +4,7 @@
 /// - Collapse consecutive '-' into one
 /// - Strip leading/trailing '-'
 /// - Return 'session' if result is empty
-#[allow(dead_code)]
+#[inline]
 pub fn sanitize_session_name(name: &str) -> String {
     // Step 1: Replace any character not in [a-zA-Z0-9-] with '-'
     let mut result: Vec<char> = name
@@ -54,7 +54,7 @@ pub fn sanitize_session_name(name: &str) -> String {
 /// If base is not in sessions, returns base unchanged.
 /// Otherwise starts at suffix=2 and finds the first available gap.
 /// Example: sessions=['myapp','myapp-2','myapp-5'] → returns 'myapp-3'
-#[allow(dead_code)]
+#[inline]
 pub fn get_unique_session_name(base: &str, sessions: &[String]) -> String {
     let sessions_set: std::collections::HashSet<&str> =
         sessions.iter().map(|s| s.as_str()).collect();
