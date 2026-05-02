@@ -24,18 +24,24 @@ multiplexer = "tmux"
 auto_attach = true
 "#;
 
+/// Result type for config initialization.
+#[derive(Debug)]
+pub enum ConfigInitResult {
+    /// Config was newly created at this path.
+    Created(PathBuf),
+    /// Config already existed at this path.
+    AlreadyExists(PathBuf),
+}
+
 /// Creates a default config file at the platform-specific config directory.
-/// Returns the path where the config was created.
-/// Returns an error if the config file already exists or if directory creation fails.
-pub fn create_default_config() -> Result<PathBuf, io::Error> {
+/// Returns the path where the config is located and whether it was created or already existed.
+/// Returns an error only if directory creation or file writing fails.
+pub fn create_default_config() -> Result<ConfigInitResult, io::Error> {
     let config_path = get_config_path();
 
     // Check if config already exists
     if config_path.exists() {
-        return Err(io::Error::new(
-            io::ErrorKind::AlreadyExists,
-            format!("Config file already exists at {}", config_path.display()),
-        ));
+        return Ok(ConfigInitResult::AlreadyExists(config_path));
     }
 
     // Create parent directory if it doesn't exist
@@ -46,7 +52,7 @@ pub fn create_default_config() -> Result<PathBuf, io::Error> {
     // Write default config content
     std::fs::write(&config_path, DEFAULT_CONFIG_CONTENT)?;
 
-    Ok(config_path)
+    Ok(ConfigInitResult::Created(config_path))
 }
 
 /// Loads the config from the platform-specific config directory.

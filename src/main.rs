@@ -4,7 +4,7 @@ mod sanitize;
 mod tmux;
 mod zellij;
 
-use crate::config::{create_default_config, load_config, Config};
+use crate::config::{create_default_config, load_config, Config, ConfigInitResult};
 use crate::detect::{detect_multiplexer, Multiplexer};
 
 use crate::sanitize::{get_unique_session_name, sanitize_session_name};
@@ -67,8 +67,12 @@ fn parse_args() -> Vec<String> {
                 std::process::exit(0);
             }
             "--init" => match create_default_config() {
-                Ok(path) => {
+                Ok(ConfigInitResult::Created(path)) => {
                     println!("Created default config at: {}", path.display());
+                    std::process::exit(0);
+                }
+                Ok(ConfigInitResult::AlreadyExists(path)) => {
+                    println!("Config already exists at: {}", path.display());
                     std::process::exit(0);
                 }
                 Err(e) => {
