@@ -25,6 +25,11 @@ pub trait MuxLauncher {
 
 /// POSIX shell escape: wraps input in single quotes, replacing internal `'` with `'"'"'`.
 /// If input is empty, returns `''`.
+///
+/// # Security
+/// This prevents command injection when session names or paths contain special characters
+/// (quotes, semicolons, backticks, variable substitutions, etc.) by ensuring the entire
+/// string is treated as a single literal argument to the shell.
 #[inline]
 pub(crate) fn shell_escape(value: &str) -> String {
     if value.is_empty() {
