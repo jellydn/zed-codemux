@@ -1,5 +1,3 @@
-use regex::Regex;
-
 /// Sanitizes a workspace name into a tmux/zellij-safe session name.
 /// Matches the exact vscode-mux algorithm:
 /// - Replace any char not in [a-zA-Z0-9-] with '-'
@@ -9,26 +7,46 @@ use regex::Regex;
 #[allow(dead_code)]
 pub fn sanitize_session_name(name: &str) -> String {
     // Step 1: Replace any character not in [a-zA-Z0-9-] with '-'
-    let invalid_char_re = Regex::new(r"[^a-zA-Z0-9-]").unwrap();
-    let replaced = invalid_char_re.replace_all(name, "-");
+    let mut result: Vec<char> = name
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' {
+                c
+            } else {
+                '-'
+            }
+        })
+        .collect();
 
     // Step 2: Collapse consecutive '-' into single '-'
-    let collapse_re = Regex::new(r"-{2,}").unwrap();
-    let collapsed = collapse_re.replace_all(&replaced, "-");
+    let mut collapsed = Vec::with_capacity(result.len());
+    let mut prev_was_dash = false;
+    for c in result {
+        if c == '-' {
+            if !prev_was_dash {
+                collapsed.push(c);
+            }
+            prev_was_dash = true;
+        } else {
+            collapsed.push(c);
+            prev_was_dash = false;
+        }
+    }
+    result = collapsed;
 
-    // Step 3: Strip leading '-'
-    let leading_re = Regex::new(r"^-+").unwrap();
-    let no_leading = leading_re.replace_all(&collapsed, "");
-
-    // Step 4: Strip trailing '-'
-    let trailing_re = Regex::new(r"-+$").unwrap();
-    let result = trailing_re.replace_all(&no_leading, "");
+    // Step 3 & 4: Strip leading and trailing '-'
+    while result.first() == Some(&'-') {
+        result.remove(0);
+    }
+    while result.last() == Some(&'-') {
+        result.pop();
+    }
 
     // Step 5: Return 'session' if result is empty
     if result.is_empty() {
         "session".to_string()
     } else {
-        result.to_string()
+        result.into_iter().collect()
     }
 }
 
