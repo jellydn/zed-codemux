@@ -56,17 +56,17 @@ pub fn sanitize_session_name(name: &str) -> String {
 /// Example: sessions=['myapp','myapp-2','myapp-5'] → returns 'myapp-3'
 #[inline]
 pub fn get_unique_session_name(base: &str, sessions: &[String]) -> String {
-    let sessions_set: std::collections::HashSet<&str> =
-        sessions.iter().map(|s| s.as_str()).collect();
+    // Linear search is faster than HashSet for small lists (typical case < 10 sessions)
+    let contains = |s: &str| sessions.iter().any(|session| session == s);
 
-    if !sessions_set.contains(base) {
+    if !contains(base) {
         return base.to_string();
     }
 
     let mut suffix = 2;
     loop {
         let candidate = format!("{base}-{suffix}");
-        if !sessions_set.contains(candidate.as_str()) {
+        if !contains(&candidate) {
             return candidate;
         }
         suffix += 1;
