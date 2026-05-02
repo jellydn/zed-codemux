@@ -18,8 +18,8 @@
         "Typecheck passes (cargo check passes)"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Completed: Cargo.toml with [[bin]] target, all dependencies (clap with derive, which, serde, toml, anyhow, regex, dirs), src/main.rs, .gitignore with /target and .DS_Store, LICENSE (MIT 2026 jellydn). Build and tests pass."
     },
     {
       "id": "US-002",
