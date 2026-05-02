@@ -1,17 +1,27 @@
 mod config;
 mod detect;
-mod launcher;
 mod sanitize;
 mod tmux;
 mod zellij;
 
 use crate::config::{load_config, Config};
 use crate::detect::{detect_multiplexer, Multiplexer};
-use crate::launcher::MuxLauncher;
+
 use crate::sanitize::{get_unique_session_name, sanitize_session_name};
 use crate::tmux::TmuxLauncher;
 use crate::zellij::ZellijLauncher;
 use std::collections::HashMap;
+use std::io::Error;
+
+/// Trait for multiplexer launchers (tmux, zellij)
+#[allow(dead_code)]
+pub trait MuxLauncher {
+    /// List all active sessions for this multiplexer
+    fn list_sessions(&self) -> Result<Vec<String>, Error>;
+
+    /// Build the shell command string to launch/attach to a session
+    fn build_command(&self, name: &str, cwd: &str, auto_attach: bool) -> String;
+}
 
 /// POSIX shell escape: wraps input in single quotes, replacing internal `'` with `'"'"'`.
 /// If input is empty, returns `''`.
