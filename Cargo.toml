@@ -15,7 +15,7 @@ name = "codemux"
 path = "src/main.rs"
 
 [dependencies]
-clap = { version = "4.5", default-features = false, features = ["derive", "std", "help", "usage"] }
+
 
 serde = { version = "1.0", features = ["derive"] }
 toml = "0.8"

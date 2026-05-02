@@ -13,20 +13,40 @@ use crate::sanitize::{get_unique_session_name, sanitize_session_name};
 use crate::tmux::TmuxLauncher;
 use crate::zellij::ZellijLauncher;
 use anyhow::Result;
-use clap::Parser;
 use std::collections::HashMap;
 
-/// CodeMux - Open Zed terminals inside tmux or zellij
-#[derive(Parser)]
-#[command(name = "codemux")]
-#[command(about = "Open Zed terminals inside tmux or zellij — port of vscode-mux to Zed")]
-#[command(version)]
-#[command(trailing_var_arg = true)]
-#[command(allow_hyphen_values = true)]
-struct Cli {
-    /// Additional arguments to pass to the shell (not currently used)
-    #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
-    args: Vec<String>,
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// Simple CLI parser for --version and --help
+fn parse_args() -> Vec<String> {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+
+    for arg in &args {
+        match arg.as_str() {
+            "-v" | "--version" | "-V" => {
+                println!("codemux {}", VERSION);
+                std::process::exit(0);
+            }
+            "-h" | "--help" | "-?" => {
+                println!("codemux {}", VERSION);
+                println!();
+                println!("Drop-in CLI binary that opens Zed terminals inside tmux or zellij.");
+                println!();
+                println!("Usage: codemux [ARGS]...");
+                println!();
+                println!("Arguments:");
+                println!("  [ARGS]...  Additional arguments to pass to the shell");
+                println!();
+                println!("Options:");
+                println!("  -h, --help     Print help");
+                println!("  -V, --version  Print version");
+                std::process::exit(0);
+            }
+            _ => {}
+        }
+    }
+
+    args
 }
 
 /// Checks if debug mode is enabled via CODEMUX_DEBUG=1
@@ -82,7 +102,7 @@ fn decide_fallback_shell(env: &HashMap<String, String>) -> String {
 
 fn main() -> Result<()> {
     // Parse CLI arguments (handles --version and --help)
-    let _cli = Cli::parse();
+    let _args = parse_args();
 
     // Get current working directory
     let cwd = std::env::current_dir()?;
