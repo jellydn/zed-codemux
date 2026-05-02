@@ -67,7 +67,16 @@ This project follows the same lean approach as [`th0jensen/fff-gpui`](https://gi
 
 ## Installation
 
-Build from source (only path supported in v1, mirroring `fff-gpui`):
+### Homebrew (macOS & Linux)
+
+The easiest way to install codemux on macOS and Linux:
+
+```bash
+brew tap jellydn/tap
+brew install codemux
+```
+
+### Build from source
 
 ```sh
 git clone https://github.com/jellydn/zed-codemux
@@ -80,8 +89,6 @@ The binary will be at `target/release/codemux`. Move it onto your `$PATH` or ref
 ```sh
 install -m 0755 target/release/codemux /usr/local/bin/codemux
 ```
-
-> Future v1.x will add `cargo install codemux`, a Homebrew tap, and prebuilt GitHub Release binaries.
 
 ---
 
@@ -281,8 +288,8 @@ See [`tasks/prd-zed-mux.md`](tasks/prd-zed-mux.md) for the full PRD and [`script
 
 | Version | Highlights |
 |---|---|
-| **v1.0** | Drop-in CLI binary, vscode-mux parity (sanitization + indexing + commands), source build, two Zed integration patterns |
-| **v1.1** | `cargo install codemux`, Homebrew tap, prebuilt GitHub Release binaries |
+| **v1.0** | Drop-in CLI binary, vscode-mux parity (sanitization + indexing + commands), source build, two Zed integration patterns, Homebrew tap |
+| **v1.1** | `cargo install codemux`, prebuilt GitHub Release binaries |
 | **v2.0** | `codemux kill <name>` subcommand; per-workspace `.codemux.toml`; optional Zed extension manifest if/when Zed adds terminal-profile API |
 
 ---

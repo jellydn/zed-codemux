@@ -229,10 +229,10 @@ fn exec_command(command: &str) -> io::Result<()> {
 
     let err = Command::new(&shell).args(["-l", "-c", command]).exec();
 
-    // If exec fails, return an error
+    // If exec fails, return an error (shell path is escaped for security)
     Err(io::Error::new(
         io::ErrorKind::Other,
-        format!("Failed to exec {}: {}", shell, err),
+        format!("Failed to exec {}: {}", shell_escape(&shell), err),
     ))
 }
 
@@ -275,7 +275,7 @@ fn run_fallback_shell(env: &HashMap<String, String>) -> io::Result<()> {
         let err = Command::new(&shell).exec();
         Err(io::Error::new(
             io::ErrorKind::Other,
-            format!("Failed to exec shell {}: {}", shell, err),
+            format!("Failed to exec shell {}: {}", shell_escape(&shell), err),
         ))
     }
 

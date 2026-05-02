@@ -10,11 +10,11 @@
 - Impact: Future config file extensions may break or require parser rewrites
 - Fix approach: Migrate to `toml` crate if config complexity increases
 
-**Process Model - Unix exec() error handling:**
+**Process Model - Unix exec() error handling:** ✅ **FIXED**
 - Issue: On Unix, if `exec()` fails, the error message format includes the raw error which may contain unescaped shell path
-- Files: `/Users/huynhdung/conductor/workspaces/2026-05-01-zed-codemux/brisbane/src/main.rs` (lines 232-236)
+- Files: `/Users/huynhdung/conductor/workspaces/2026-05-01-zed-codemux/brisbane/src/main.rs` (lines 232-236, 265-269)
 - Impact: Error message construction could theoretically be exploited if SHELL env var contains malicious input
-- Fix approach: Apply shell_escape to the shell path in error messages
+- Fix: Applied `shell_escape()` to shell paths in all error messages from `exec_command()` and `run_fallback_shell()` functions
 
 **Zellij CWD limitation:**
 - Issue: zellij.rs build_command ignores the `_cwd` parameter in non-auto-attach mode (line 67-68 comment confirms this). Zellij doesn't support `-c` for setting cwd when creating new sessions via `zellij -s`.
@@ -123,11 +123,11 @@
 
 ## Test Coverage Gaps
 
-**PATH-Based Detection:**
+**PATH-Based Detection:** ✅ **FIXED**
 - What's not tested: The actual `find_in_path` function that scans filesystem for tmux/zellij binaries
 - Files: `/Users/huynhdung/conductor/workspaces/2026-05-01-zed-codemux/brisbane/src/detect.rs` (lines 23-46, 75-86)
 - Risk: PATH parsing edge cases (empty entries, malformed paths, Windows .exe handling)
-- Priority: Low - documented as intentional limitation; "Making PATH testable would require additional abstraction overhead for little practical benefit"
+- Fix: Refactored `find_in_path` to use a testable helper `find_in_path_with_env()` and added 4 comprehensive tests covering: finding binaries in PATH, missing binaries, empty PATH entries, and multiple directory search
 
 **Actual Multiplexer Integration:**
 - What's not tested: No tests actually run tmux or zellij commands

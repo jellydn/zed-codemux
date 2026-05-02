@@ -23,8 +23,15 @@ impl Multiplexer {
 fn find_in_path(binary: &str) -> bool {
     let path_env = std::env::var("PATH").unwrap_or_default();
     let path_sep = if cfg!(windows) { ';' } else { ':' };
+    find_in_path_with_env(binary, &path_env, path_sep)
+}
 
+/// Testable version of find_in_path that accepts explicit PATH env string.
+fn find_in_path_with_env(binary: &str, path_env: &str, path_sep: char) -> bool {
     for dir in path_env.split(path_sep) {
+        if dir.is_empty() {
+            continue;
+        }
         let full_path = std::path::Path::new(dir).join(binary);
 
         // On Windows, also check for .exe extension if not already present
@@ -231,5 +238,102 @@ mod tests {
         assert_eq!(Multiplexer::from_name("ZELLIJ"), Some(Multiplexer::Zellij));
         assert_eq!(Multiplexer::from_name("invalid"), None);
         assert_eq!(Multiplexer::from_name(""), None);
+    }
+
+    // Tests for find_in_path_with_env (testable PATH probing)
+
+    #[test]
+    fn test_find_in_path_finds_binary() {
+        use std::io::Write;
+
+        // Create a temp directory with a mock binary
+        let temp_dir = std::env::temp_dir().join(format!("codemux_test_{}", std::process::id()));
+        std::fs::create_dir_all(&temp_dir).unwrap();
+
+        let binary_name = if cfg!(windows) { "tmux.exe" } else { "tmux" };
+        let binary_path = temp_dir.join(binary_name);
+        let mut file = std::fs::File::create(&binary_path).unwrap();
+        file.write_all(b"#!/bin/sh\necho mock").unwrap();
+
+        // Make executable on Unix
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = std::fs::metadata(&binary_path).unwrap().permissions();
+            perms.set_mode(0o755);
+            std::fs::set_permissions(&binary_path, perms).unwrap();
+        }
+
+        // Build PATH string
+        let path_env = temp_dir.to_string_lossy().to_string();
+
+        // Should find the binary
+        assert!(find_in_path_with_env("tmux", &path_env, ':'));
+
+        // Cleanup
+        std::fs::remove_file(&binary_path).unwrap();
+        std::fs::remove_dir(&temp_dir).unwrap();
+    }
+
+    #[test]
+    fn test_find_in_path_missing_binary() {
+        // Empty temp directory path that doesn't exist
+        let path_env = "/nonexistent/path";
+
+        // Should not find tmux
+        assert!(!find_in_path_with_env("tmux", path_env, ':'));
+    }
+
+    #[test]
+    fn test_find_in_path_empty_path_entries() {
+        // PATH with empty entries (double colons) should be handled
+        let path_env = "/valid/path::/another/path";
+
+        // Should not panic on empty entries (even though no binary exists)
+        assert!(!find_in_path_with_env("nonexistent", path_env, ':'));
+    }
+
+    #[test]
+    fn test_find_in_path_multiple_directories() {
+        use std::io::Write;
+
+        // Create two temp directories
+        let temp_dir1 = std::env::temp_dir().join(format!("codemux_test1_{}", std::process::id()));
+        let temp_dir2 = std::env::temp_dir().join(format!("codemux_test2_{}", std::process::id()));
+        std::fs::create_dir_all(&temp_dir1).unwrap();
+        std::fs::create_dir_all(&temp_dir2).unwrap();
+
+        // Put binary in second directory
+        let binary_name = if cfg!(windows) {
+            "zellij.exe"
+        } else {
+            "zellij"
+        };
+        let binary_path = temp_dir2.join(binary_name);
+        let mut file = std::fs::File::create(&binary_path).unwrap();
+        file.write_all(b"#!/bin/sh\necho mock").unwrap();
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = std::fs::metadata(&binary_path).unwrap().permissions();
+            perms.set_mode(0o755);
+            std::fs::set_permissions(&binary_path, perms).unwrap();
+        }
+
+        // Build PATH with both directories (colon-separated)
+        let path_env = format!(
+            "{}:{}",
+            temp_dir1.to_string_lossy(),
+            temp_dir2.to_string_lossy()
+        );
+
+        // Should find zellij in second directory
+        assert!(find_in_path_with_env("zellij", &path_env, ':'));
+
+        // Cleanup
+        std::fs::remove_file(&binary_path).unwrap();
+        std::fs::remove_dir(&temp_dir1).unwrap();
+        std::fs::remove_dir(&temp_dir2).unwrap();
     }
 }
