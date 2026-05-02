@@ -2,7 +2,6 @@ mod config;
 mod detect;
 mod launcher;
 mod sanitize;
-mod shell_escape;
 mod tmux;
 mod zellij;
 
@@ -13,6 +12,15 @@ use crate::sanitize::{get_unique_session_name, sanitize_session_name};
 use crate::tmux::TmuxLauncher;
 use crate::zellij::ZellijLauncher;
 use std::collections::HashMap;
+
+/// POSIX shell escape: wraps input in single quotes, replacing internal `'` with `'"'"'`.
+/// If input is empty, returns `''`.
+pub fn shell_escape(value: &str) -> String {
+    if value.is_empty() {
+        return "''".to_string();
+    }
+    format!("'{}'", value.replace('\'', "'\"'\"'"))
+}
 use std::io;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -453,5 +461,48 @@ mod tests {
         env.insert("CODEMUX_DEBUG".to_string(), "".to_string());
 
         assert!(!debug_enabled(&env));
+    }
+
+    // Tests for shell_escape
+
+    #[test]
+    fn test_shell_escape_empty_string() {
+        assert_eq!(shell_escape(""), "''");
+    }
+
+    #[test]
+    fn test_shell_escape_simple_string() {
+        assert_eq!(shell_escape("foo"), "'foo'");
+    }
+
+    #[test]
+    fn test_shell_escape_with_single_quote() {
+        // "it's" → "'it'\"'\"'s'"
+        assert_eq!(shell_escape("it's"), "'it'\"'\"'s'");
+    }
+
+    #[test]
+    fn test_shell_escape_path_with_spaces() {
+        assert_eq!(shell_escape("/path with spaces"), "'/path with spaces'");
+    }
+
+    #[test]
+    fn test_shell_escape_multiple_single_quotes() {
+        // "don't" → "'don'\"'\"'t'"
+        assert_eq!(shell_escape("don't"), "'don'\"'\"'t'");
+    }
+
+    #[test]
+    fn test_shell_escape_only_single_quote() {
+        // "'" → "''\"'\"''"
+        assert_eq!(shell_escape("'"), "''\"'\"''");
+    }
+
+    #[test]
+    fn test_shell_escape_special_chars_no_quotes() {
+        // Characters like $, `, \, etc. should just be wrapped
+        assert_eq!(shell_escape("$HOME"), "'$HOME'");
+        assert_eq!(shell_escape("`echo hi`"), "'`echo hi`'");
+        assert_eq!(shell_escape("back\\slash"), "'back\\slash'");
     }
 }

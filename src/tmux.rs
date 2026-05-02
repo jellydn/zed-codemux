@@ -1,5 +1,5 @@
 use crate::launcher::MuxLauncher;
-use crate::shell_escape::shell_escape;
+use crate::shell_escape;
 use std::io::{Error, ErrorKind};
 use std::process::Command;
 
