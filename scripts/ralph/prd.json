@@ -2,9 +2,7 @@
   "project": "CodeMux for Zed",
   "branchName": "ralph/zed-codemux",
   "description": "Drop-in CLI binary (codemux) that opens Zed terminals inside tmux/zellij — port of vscode-mux to Zed, packaged in the lean style of th0jensen/fff-gpui (pure Rust binary, no Zed extension manifest, integration via Zed settings.json or tasks.json + keymap.json). Mirrors vscode-mux session-naming and multi-window indexing exactly so the same workspace opened in VS Code and Zed lands in the same multiplexer session.",
-  "knownIssues": [
-    "`Cargo.toml` declares both `serde = { version = \"1.0\", features = [\"derive\"] }` and a separate `serde_derive = \"1.0\"`. The latter is redundant — `serde`'s `derive` feature pulls in `serde_derive` transitively. Remove the standalone `serde_derive` dependency."
-  ],
+  "knownIssues": [],
   "userStories": [
     {
       "id": "US-001",
@@ -282,8 +280,8 @@
         "Tests pass"
       ],
       "priority": 16,
-      "passes": false,
-      "notes": "New cleanup story added during PRD review. Resolves the Cargo.toml entry in `knownIssues`."
+      "passes": true,
+      "notes": "Completed: Removed redundant serde_derive = \"1.0\" from Cargo.toml. The serde crate with derive feature already pulls it in transitively. All 71 tests pass, clippy clean, formatting correct."
     }
   ]
 }

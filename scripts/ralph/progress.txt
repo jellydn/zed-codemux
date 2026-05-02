@@ -230,3 +230,15 @@
   - All 71 tests still pass after deletions, clippy clean, formatting correct
 ---
 
+
+## 2026-05-02 14:35 - US-016
+- What was implemented: Removed redundant serde_derive dependency from Cargo.toml
+- Files changed: Cargo.toml (removed line 21: serde_derive = "1.0")
+- **Learnings for future iterations:**
+  - The serde crate's "derive" feature already pulls in serde_derive transitively
+  - Keep dependency graph minimal by avoiding redundant declarations
+  - Cargo.lock updated automatically via cargo build
+  - All 71 tests pass after cleanup, clippy clean, formatting correct
+  - knownIssues array is now empty - all cleanup complete!
+---
+
