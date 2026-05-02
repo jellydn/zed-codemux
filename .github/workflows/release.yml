@@ -150,7 +150,12 @@ jobs:
           sudo mv codemux /usr/local/bin/
           ```
 
-          ### Build from source
+          ### cargo install
+          ```bash
+          cargo install codemux
+          ```
+
+          ### Build from source (latest dev)
           ```bash
           cargo install --git https://github.com/${{ github.repository }}
           ```

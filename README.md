@@ -5,10 +5,10 @@
 </p>
 
 <p align="center">
+  <a href="https://crates.io/crates/codemux" target="__blank"><img src="https://img.shields.io/crates/v/codemux.svg?color=eee&amp;label=crates.io&logo=rust" alt="Crates.io" /></a>
   <a href="https://github.com/jellydn/zed-codemux/releases" target="__blank"><img src="https://img.shields.io/github/v/release/jellydn/zed-codemux.svg?color=eee&amp;label=GitHub%20Releases&logo=github" alt="GitHub Releases" /></a>
   <a href="https://github.com/jellydn/zed-codemux/stargazers" target="__blank"><img src="https://img.shields.io/github/stars/jellydn/zed-codemux?style=flat&logo=github&color=eee" alt="GitHub Stars" /></a>
   <a href="https://github.com/jellydn/vscode-mux" target="__blank"><img src="https://img.shields.io/badge/port%20from-vscode--mux-007ACC?style=flat&labelColor=eee" alt="Port from vscode-mux" /></a>
-  <a href="https://www.rust-lang.org/" target="__blank"><img src="https://img.shields.io/badge/built%20with-Rust-DEA584?logo=rust&color=eee" alt="Built with Rust" /></a>
 </p>
 
 <p align="center">
@@ -46,6 +46,14 @@ If you rely on tmux or zellij for terminal multiplexing, Zed's default terminal 
 
 ## Installation
 
+### cargo install (recommended)
+
+```bash
+cargo install codemux
+```
+
+Requires [Rust](https://rustup.rs/) toolchain. The binary will be installed to `~/.cargo/bin/codemux`.
+
 ### Homebrew (macOS & Linux)
 
 ```bash
@@ -72,13 +80,10 @@ chmod +x codemux
 sudo mv codemux /usr/local/bin/
 ```
 
-### Build from source
+### Build from source (latest dev)
 
 ```bash
-git clone https://github.com/jellydn/zed-codemux
-cd zed-codemux
-cargo build --release
-install -m 0755 target/release/codemux /usr/local/bin/codemux
+cargo install --git https://github.com/jellydn/zed-codemux
 ```
 
 ## Usage
@@ -220,11 +225,11 @@ Options:
 
 ## Roadmap
 
-| Version | Highlights |
-|---|---|
-| **v1.0** | Drop-in CLI binary, vscode-mux parity, Homebrew tap, prebuilt binaries, `--init` flag |
-| **v1.1** | `cargo install codemux`; Zed extension marketplace listing |
-| **v2.0** | `codemux kill <name>` subcommand; per-workspace `.codemux.toml` |
+| Version | Status | Highlights |
+|---|---|---|
+| **v1.0** | ✅ Released | Drop-in CLI binary, vscode-mux parity, Homebrew tap, prebuilt binaries, `--init` flag |
+| **v1.1** | ✅ Released | `cargo install codemux` — published to [crates.io](https://crates.io/crates/codemux) |
+| **v2.0** | Planned | `codemux kill <name>` subcommand; per-workspace `.codemux.toml`; Zed extension marketplace |
 
 ## Releasing
 
