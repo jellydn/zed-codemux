@@ -29,11 +29,10 @@ fn platform_config_dir() -> Option<PathBuf> {
 
     #[cfg(target_os = "macos")]
     {
-        // macOS: ~/Library/Application Support
+        // macOS: ~/.config (following XDG standard, matching Linux behavior)
         if let Ok(home) = std::env::var("HOME") {
             let mut path = PathBuf::from(home);
-            path.push("Library");
-            path.push("Application Support");
+            path.push(".config");
             return Some(path);
         }
     }
@@ -91,10 +90,20 @@ fn get_config_path() -> PathBuf {
     PathBuf::from("config.toml")
 }
 
-/// Parses a minimal TOML config string for our specific format.
-/// Only supports:
-///   multiplexer = "value"
-///   auto_attach = true/false
+/// Parses a minimal TOML-like config string for our specific format.
+///
+/// NOTE: This is a simplified parser that only supports basic key-value pairs.
+/// It does NOT support:
+///   - Arrays, tables, or inline tables
+///   - Escaped characters in strings
+///   - Multi-line strings
+///   - Dotted keys
+///   - Values containing '#'
+///
+/// Supported formats:
+///   multiplexer = "value"   (or 'value')
+///   auto_attach = true/false/yes/no/1/0
+///
 /// Returns defaults if parsing fails.
 #[allow(dead_code)]
 pub fn parse_config_str(contents: &str) -> Config {

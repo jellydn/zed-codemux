@@ -26,8 +26,17 @@ fn find_in_path(binary: &str) -> bool {
 
     for dir in path_env.split(path_sep) {
         let full_path = std::path::Path::new(dir).join(binary);
+
+        // On Windows, also check for .exe extension if not already present
         #[cfg(windows)]
-        let full_path = full_path.with_extension("exe");
+        {
+            if !binary.ends_with(".exe") {
+                let with_exe = std::path::Path::new(dir).join(format!("{}.exe", binary));
+                if with_exe.is_file() {
+                    return true;
+                }
+            }
+        }
 
         if full_path.is_file() {
             return true;
