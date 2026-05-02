@@ -202,7 +202,7 @@ fn exec_command(command: &str) -> Result<()> {
 
     let shell = std::env::var("SHELL")
         .or_else(|_| std::env::var("COMSPEC"))
-        .unwrap_or_else(|| "cmd.exe".to_string());
+        .unwrap_or_else(|_| "cmd.exe".to_string());
 
     let status = Command::new(&shell).args(["/C", command]).status()?;
 
