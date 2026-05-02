@@ -184,3 +184,24 @@
   - Submission guide should include: fork → create entry → update extensions.toml → PR → wait for review
   - 71 tests pass, clippy clean, formatting correct
 ---
+
+## 2026-05-02 09:20 - US-012
+- What was implemented: Added Zed integration files (.zed/tasks.json and docs/zed-integration.md) following the fff-gpui pattern
+- Files changed: `.zed/tasks.json` (new), `docs/zed-integration.md` (new), `scripts/ralph/prd.json` (US-012 marked complete)
+- **Learnings for future iterations:**
+  - `.zed/tasks.json` is a project-local convenience task (build and run codemux) — mirrors fff-gpui's pattern
+  - `docs/zed-integration.md` documents both Option A (settings.json) and Option B (tasks.json + keymap.json)
+  - fff-gpui pattern: pure binary + Zed configuration files (no bundled extension)
+  - Use `python3 -m json.tool` to validate JSON snippets in documentation
+  - All JSON in docs must be syntactically valid for user copy-paste safety
+  - 71 tests pass, clippy clean, formatting correct, JSON validation passes
+---
+
+## 2026-05-02 13:35 - US-001
+- What was implemented: Updated PRD to mark US-001 as complete (passes: true). Verified all acceptance criteria are met: Cargo.toml with [[bin]] target, all required dependencies present, src/main.rs exists, .gitignore covers /target and .DS_Store, LICENSE is MIT with 2026 copyright and author 'jellydn'. All 71 tests pass, clippy clean, formatting correct.
+- Files changed: scripts/ralph/prd.json
+- **Learnings for future iterations:**
+  - The PRD must be updated after completing each story to mark `passes: true`
+  - This session focused on PRD synchronization rather than new implementation
+  - All quality gates (fmt, clippy, test) run via pre-commit hook automatically
+---
