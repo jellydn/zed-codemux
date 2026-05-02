@@ -219,3 +219,14 @@
   - All acceptance criteria met across all 14 stories
 ---
 
+
+## 2026-05-02 14:30 - US-015
+- What was implemented: Cleanup deferred v1.1 artifacts per the fff-gpui pattern (pure binary, no extension manifest, source build only in v1)
+- Files changed: deleted extension.toml, deleted tasks/zed-extension-submission.md, deleted .github/workflows/release.yml, updated AGENTS.md (removed Zed Extension section, updated CI section, deduplicated Task runner block, noted get_unique_session_name location)
+- **Learnings for future iterations:**
+  - The fff-gpui pattern: pure Rust binary, no Zed extension manifest, integration purely via Zed user config (settings.json or tasks.json)
+  - Release workflow deferred to v1.1 - for v1, source build only via `cargo build --release`
+  - AGENTS.md should reflect the lean design philosophy throughout
+  - All 71 tests still pass after deletions, clippy clean, formatting correct
+---
+
