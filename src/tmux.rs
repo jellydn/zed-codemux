@@ -4,11 +4,9 @@ use std::process::Command;
 
 /// Tmux multiplexer launcher
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct TmuxLauncher;
 
 impl TmuxLauncher {
-    #[allow(dead_code)]
     pub fn new() -> Self {
         Self
     }

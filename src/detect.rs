@@ -52,7 +52,6 @@ fn find_in_path(binary: &str) -> bool {
 /// 3. PATH probe (prefer tmux, then zellij)
 ///
 /// Returns `None` if no multiplexer is found.
-#[allow(dead_code)]
 pub fn detect_multiplexer(config: &Config) -> Option<Multiplexer> {
     // Priority 1: Check environment variable
     if let Ok(env_mux) = std::env::var("CODEMUX_MULTIPLEXER") {
@@ -82,44 +81,44 @@ pub fn detect_multiplexer(config: &Config) -> Option<Multiplexer> {
     None
 }
 
-/// Detects which multiplexer to use, with explicit environment variable injection.
-/// This helper is useful for testing to avoid mutating the real environment.
-#[allow(dead_code)]
-pub fn detect_multiplexer_with_env(
-    config: &Config,
-    env: &std::collections::HashMap<String, String>,
-) -> Option<Multiplexer> {
-    // Priority 1: Check environment variable
-    if let Some(env_mux) = env.get("CODEMUX_MULTIPLEXER") {
-        if let Some(mux) = Multiplexer::from_name(env_mux) {
-            return Some(mux);
-        }
-    }
-
-    // Priority 2: Check config file
-    if let Some(ref config_mux) = config.multiplexer {
-        if let Some(mux) = Multiplexer::from_name(config_mux) {
-            return Some(mux);
-        }
-    }
-
-    // Priority 3: Probe PATH directly
-    // Prefer tmux first, then zellij
-    if find_in_path("tmux") {
-        return Some(Multiplexer::Tmux);
-    }
-
-    if find_in_path("zellij") {
-        return Some(Multiplexer::Zellij);
-    }
-
-    // No multiplexer found
-    None
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Detects which multiplexer to use, with explicit environment variable injection.
+    /// This helper is useful for testing to avoid mutating the real environment.
+    fn detect_multiplexer_with_env(
+        config: &Config,
+        env: &std::collections::HashMap<String, String>,
+    ) -> Option<Multiplexer> {
+        // Priority 1: Check environment variable
+        if let Some(env_mux) = env.get("CODEMUX_MULTIPLEXER") {
+            if let Some(mux) = Multiplexer::from_name(env_mux) {
+                return Some(mux);
+            }
+        }
+
+        // Priority 2: Check config file
+        if let Some(ref config_mux) = config.multiplexer {
+            if let Some(mux) = Multiplexer::from_name(config_mux) {
+                return Some(mux);
+            }
+        }
+
+        // Priority 3: Probe PATH directly
+        // Prefer tmux first, then zellij
+        if find_in_path("tmux") {
+            return Some(Multiplexer::Tmux);
+        }
+
+        if find_in_path("zellij") {
+            return Some(Multiplexer::Zellij);
+        }
+
+        // No multiplexer found
+        None
+    }
+
     use std::collections::HashMap;
 
     #[test]

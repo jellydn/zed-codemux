@@ -14,7 +14,6 @@ use std::collections::HashMap;
 use std::io::Error;
 
 /// Trait for multiplexer launchers (tmux, zellij)
-#[allow(dead_code)]
 pub trait MuxLauncher {
     /// List all active sessions for this multiplexer
     fn list_sessions(&self) -> Result<Vec<String>, Error>;

@@ -11,7 +11,6 @@ pub struct Config {
 
 /// Loads the config from the platform-specific config directory.
 /// Returns default Config if file is missing or unreadable.
-#[allow(dead_code)]
 pub fn load_config() -> Config {
     let config_path = get_config_path();
     match std::fs::read_to_string(&config_path) {
