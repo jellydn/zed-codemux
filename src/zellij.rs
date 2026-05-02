@@ -1,6 +1,6 @@
 use crate::launcher::MuxLauncher;
 use crate::shell_escape::shell_escape;
-use anyhow::Result;
+use std::io::{Error, ErrorKind};
 use std::process::Command;
 
 /// Zellij multiplexer launcher
@@ -22,7 +22,7 @@ impl Default for ZellijLauncher {
 }
 
 impl MuxLauncher for ZellijLauncher {
-    fn list_sessions(&self) -> Result<Vec<String>> {
+    fn list_sessions(&self) -> Result<Vec<String>, Error> {
         let output = Command::new("zellij")
             .args(["list-sessions", "-n"])
             .output();
@@ -46,10 +46,13 @@ impl MuxLauncher for ZellijLauncher {
             Err(e) => {
                 // Command failed to run (zellij not installed or not in PATH)
                 // Return empty list - the caller should handle missing multiplexer
-                if e.kind() == std::io::ErrorKind::NotFound {
+                if e.kind() == ErrorKind::NotFound {
                     Ok(Vec::new())
                 } else {
-                    Err(anyhow::anyhow!("Failed to run zellij: {}", e))
+                    Err(Error::new(
+                        ErrorKind::Other,
+                        format!("Failed to run zellij: {}", e),
+                    ))
                 }
             }
         }

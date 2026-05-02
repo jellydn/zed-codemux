@@ -12,8 +12,8 @@ use crate::launcher::MuxLauncher;
 use crate::sanitize::{get_unique_session_name, sanitize_session_name};
 use crate::tmux::TmuxLauncher;
 use crate::zellij::ZellijLauncher;
-use anyhow::Result;
 use std::collections::HashMap;
+use std::io;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -100,7 +100,7 @@ fn decide_fallback_shell(env: &HashMap<String, String>) -> String {
     }
 }
 
-fn main() -> Result<()> {
+fn main() -> io::Result<()> {
     // Parse CLI arguments (handles --version and --help)
     let _args = parse_args();
 
@@ -164,7 +164,7 @@ fn run_with_launcher(
     cwd: &std::path::Path,
     auto_attach: bool,
     debug: bool,
-) -> Result<()> {
+) -> io::Result<()> {
     // Get list of existing sessions
     let sessions = launcher.list_sessions()?;
 
@@ -203,7 +203,7 @@ fn run_with_launcher(
 
 /// Executes a command by exec'ing into the user's shell
 #[cfg(unix)]
-fn exec_command(command: &str) -> Result<()> {
+fn exec_command(command: &str) -> io::Result<()> {
     use std::os::unix::process::CommandExt;
     use std::process::Command;
 
@@ -212,17 +212,20 @@ fn exec_command(command: &str) -> Result<()> {
     let err = Command::new(&shell).args(["-l", "-c", command]).exec();
 
     // If exec fails, return an error
-    Err(anyhow::anyhow!("Failed to exec {}: {}", shell, err))
+    Err(io::Error::new(
+        io::ErrorKind::Other,
+        format!("Failed to exec {}: {}", shell, err),
+    ))
 }
 
 /// Executes a command by spawning and waiting (Windows version)
 #[cfg(windows)]
-fn exec_command(command: &str) -> Result<()> {
+fn exec_command(command: &str) -> io::Result<()> {
     use std::process::Command;
 
     let shell = std::env::var("SHELL")
         .or_else(|_| std::env::var("COMSPEC"))
-        .unwrap_or_else(|| "cmd.exe".to_string());
+        .unwrap_or_else(|_| "cmd.exe".to_string());
 
     let status = Command::new(&shell).args(["/C", command]).status()?;
 
@@ -232,7 +235,7 @@ fn exec_command(command: &str) -> Result<()> {
 
 /// Fallback shell for non-Unix, non-Windows systems
 #[cfg(not(any(unix, windows)))]
-fn exec_command(command: &str) -> Result<()> {
+fn exec_command(command: &str) -> io::Result<()> {
     use std::process::Command;
 
     let status = Command::new("sh").args(["-c", command]).status()?;
@@ -241,7 +244,7 @@ fn exec_command(command: &str) -> Result<()> {
 }
 
 /// Runs the fallback shell when no multiplexer is installed
-fn run_fallback_shell(env: &HashMap<String, String>) -> Result<()> {
+fn run_fallback_shell(env: &HashMap<String, String>) -> io::Result<()> {
     let shell = decide_fallback_shell(env);
 
     eprintln!("codemux: tmux/zellij not found on PATH -- falling back to {}. Install tmux or zellij to enable multiplexer mode.", shell);
@@ -252,7 +255,10 @@ fn run_fallback_shell(env: &HashMap<String, String>) -> Result<()> {
         use std::process::Command;
 
         let err = Command::new(&shell).exec();
-        Err(anyhow::anyhow!("Failed to exec shell {}: {}", shell, err))
+        Err(io::Error::new(
+            io::ErrorKind::Other,
+            format!("Failed to exec shell {}: {}", shell, err),
+        ))
     }
 
     #[cfg(windows)]
