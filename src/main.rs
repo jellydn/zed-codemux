@@ -11,6 +11,7 @@ use crate::sanitize::{get_unique_session_name, sanitize_session_name};
 use crate::tmux::TmuxLauncher;
 use crate::zellij::ZellijLauncher;
 use std::collections::HashMap;
+use std::io;
 use std::io::Error;
 
 /// Trait for multiplexer launchers (tmux, zellij)
@@ -34,7 +35,6 @@ pub(crate) fn shell_escape(value: &str) -> String {
     }
     format!("'{}'", value.replace('\'', "'\"'\"'"))
 }
-use std::io;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
