@@ -19,6 +19,24 @@ impl Multiplexer {
     }
 }
 
+/// Checks if a binary exists in PATH by searching through PATH directories.
+fn find_in_path(binary: &str) -> bool {
+    let path_env = std::env::var("PATH").unwrap_or_default();
+    let path_sep = if cfg!(windows) { ';' } else { ':' };
+
+    for dir in path_env.split(path_sep) {
+        let full_path = std::path::Path::new(dir).join(binary);
+        #[cfg(windows)]
+        let full_path = full_path.with_extension("exe");
+
+        if full_path.is_file() {
+            return true;
+        }
+    }
+
+    false
+}
+
 /// Detects which multiplexer to use, following the priority order:
 /// 1. Environment variable `CODEMUX_MULTIPLEXER`
 /// 2. Config file `multiplexer` field
@@ -41,13 +59,13 @@ pub fn detect_multiplexer(config: &Config) -> Option<Multiplexer> {
         }
     }
 
-    // Priority 3: Probe PATH via `which` crate
+    // Priority 3: Probe PATH directly
     // Prefer tmux first, then zellij
-    if which::which("tmux").is_ok() {
+    if find_in_path("tmux") {
         return Some(Multiplexer::Tmux);
     }
 
-    if which::which("zellij").is_ok() {
+    if find_in_path("zellij") {
         return Some(Multiplexer::Zellij);
     }
 
@@ -76,13 +94,13 @@ pub fn detect_multiplexer_with_env(
         }
     }
 
-    // Priority 3: Probe PATH via `which` crate
+    // Priority 3: Probe PATH directly
     // Prefer tmux first, then zellij
-    if which::which("tmux").is_ok() {
+    if find_in_path("tmux") {
         return Some(Multiplexer::Tmux);
     }
 
-    if which::which("zellij").is_ok() {
+    if find_in_path("zellij") {
         return Some(Multiplexer::Zellij);
     }
 
