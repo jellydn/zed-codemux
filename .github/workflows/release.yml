@@ -1,5 +1,10 @@
 name: Release
 
+# Required secrets:
+#   CARGO_REGISTRY_TOKEN - crates.io API token (https://crates.io/settings/tokens)
+#   HOMEBREW_TAP_TOKEN     - GitHub PAT with 'repo' scope (for jellydn/homebrew-tap)
+# Setup: ./scripts/setup-secrets.sh
+
 on:
   push:
     tags:

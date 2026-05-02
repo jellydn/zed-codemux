@@ -226,6 +226,29 @@ Options:
 | **v1.1** | `cargo install codemux`; Zed extension marketplace listing |
 | **v2.0** | `codemux kill <name>` subcommand; per-workspace `.codemux.toml` |
 
+## Releasing
+
+### First-time setup (repo maintainer only)
+
+```bash
+# Install GitHub CLI and authenticate
+brew install gh
+gh auth login
+
+# Setup required secrets (crates.io token + GitHub PAT)
+./scripts/setup-secrets.sh
+```
+
+### Creating a release
+
+```bash
+# Tag and push (triggers release workflow)
+git tag -a v0.1.0 -m "Release v0.1.0"
+git push origin v0.1.0
+```
+
+The workflow automatically builds binaries for all platforms, publishes to crates.io, creates a GitHub Release, and updates the Homebrew formula.
+
 ## Credits
 
 - [`vscode-mux`](https://github.com/jellydn/vscode-mux) by [@jellydn](https://github.com/jellydn) — the original VS Code extension this project ports
