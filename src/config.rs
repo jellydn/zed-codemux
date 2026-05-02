@@ -75,6 +75,10 @@ fn get_config_path() -> PathBuf {
 ///   multiplexer = "value"   (or 'value')
 ///   auto_attach = true/false/yes/no/1/0
 ///
+/// Note on unquoted values: `multiplexer = tmux` (without quotes) will be
+/// parsed as the string "tmux" after trimming - this is acceptable for
+/// our use case since we strip quotes anyway, but differs from strict TOML.
+///
 /// Returns defaults if parsing fails.
 pub fn parse_config_str(contents: &str) -> Config {
     let mut config = Config::default();

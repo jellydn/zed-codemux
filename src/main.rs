@@ -29,6 +29,9 @@ pub fn shell_escape(value: &str) -> String {
     if value.is_empty() {
         return "''".to_string();
     }
+    if !value.contains('\'') {
+        return format!("'{}'", value);
+    }
     format!("'{}'", value.replace('\'', "'\"'\"'"))
 }
 use std::io;
