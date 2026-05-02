@@ -46,3 +46,23 @@ clean:
 # Run pre-commit hooks manually via prek
 lint:
     prek run --all-files
+
+# Dry-run publish to crates.io (verifies package without uploading)
+publish-dry:
+    cargo publish --dry-run
+
+# Publish to crates.io (runs checks first, then publishes)
+publish: check publish-dry
+    @echo "Publishing to crates.io..."
+    cargo publish
+    @echo "Published successfully!"
+
+# Create a git tag for the current version (run after publish)
+tag:
+    @VERSION=$(cargo metadata --format-version 1 | jq -r '.packages[] | select(.name == "codemux") | .version') && \
+    git tag -a "v$$VERSION" -m "Release v$$VERSION" && \
+    echo "Created tag v$$VERSION"
+
+# Full release flow: check, publish, and tag
+release: publish tag
+    @echo "Release complete!"
