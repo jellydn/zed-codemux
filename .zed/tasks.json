@@ -1,0 +1,8 @@
+[
+  {
+    "label": "Build and run codemux",
+    "command": "cargo build --release && ./target/release/codemux",
+    "hide": "on_success",
+    "save": "all"
+  }
+]
