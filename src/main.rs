@@ -4,7 +4,7 @@ mod sanitize;
 mod tmux;
 mod zellij;
 
-use crate::config::{load_config, Config};
+use crate::config::{create_default_config, load_config, Config};
 use crate::detect::{detect_multiplexer, Multiplexer};
 
 use crate::sanitize::{get_unique_session_name, sanitize_session_name};
@@ -38,7 +38,7 @@ use std::io;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// Simple CLI parser for --version and --help
+/// Simple CLI parser for --version, --help, and --init
 fn parse_args() -> Vec<String> {
     let args: Vec<String> = std::env::args().skip(1).collect();
 
@@ -53,16 +53,29 @@ fn parse_args() -> Vec<String> {
                 println!();
                 println!("Drop-in CLI binary that opens Zed terminals inside tmux or zellij.");
                 println!();
-                println!("Usage: codemux [ARGS]...");
+                println!("Usage: codemux [OPTIONS] [ARGS]...");
                 println!();
                 println!("Arguments:");
                 println!("  [ARGS]...  Additional arguments to pass to the shell");
                 println!();
                 println!("Options:");
                 println!("  -h, --help     Print help");
+                println!(
+                    "  --init         Create default config file at ~/.config/codemux/config.toml"
+                );
                 println!("  -V, --version  Print version");
                 std::process::exit(0);
             }
+            "--init" => match create_default_config() {
+                Ok(path) => {
+                    println!("Created default config at: {}", path.display());
+                    std::process::exit(0);
+                }
+                Err(e) => {
+                    eprintln!("Error creating config: {}", e);
+                    std::process::exit(1);
+                }
+            },
             _ => {}
         }
     }

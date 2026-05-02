@@ -1,3 +1,4 @@
+use std::io;
 use std::path::PathBuf;
 
 /// Configuration for codemux, loaded from `~/.config/codemux/config.toml` (or platform equivalent).
@@ -7,6 +8,45 @@ pub struct Config {
     pub multiplexer: Option<String>,
     /// Whether to auto-attach to existing sessions
     pub auto_attach: Option<bool>,
+}
+
+/// Default configuration content as a TOML string with comments.
+const DEFAULT_CONFIG_CONTENT: &str = r#"# CodeMux configuration file
+# Location: ~/.config/codemux/config.toml
+
+# Preferred multiplexer: "tmux" or "zellij"
+# If not set, codemux will auto-detect from PATH (prefers tmux if both available)
+multiplexer = "tmux"
+
+# Whether to auto-attach to existing sessions
+# true = attach to existing session with same name if it exists
+# false = always create a new session with unique name
+auto_attach = true
+"#;
+
+/// Creates a default config file at the platform-specific config directory.
+/// Returns the path where the config was created.
+/// Returns an error if the config file already exists or if directory creation fails.
+pub fn create_default_config() -> Result<PathBuf, io::Error> {
+    let config_path = get_config_path();
+
+    // Check if config already exists
+    if config_path.exists() {
+        return Err(io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            format!("Config file already exists at {}", config_path.display()),
+        ));
+    }
+
+    // Create parent directory if it doesn't exist
+    if let Some(parent) = config_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    // Write default config content
+    std::fs::write(&config_path, DEFAULT_CONFIG_CONTENT)?;
+
+    Ok(config_path)
 }
 
 /// Loads the config from the platform-specific config directory.
@@ -265,5 +305,21 @@ auto_attach = invalid_value
         let config = parse_config_str(toml);
         assert_eq!(config.multiplexer, Some("tmux".to_string()));
         assert_eq!(config.auto_attach, None); // Not Some(false), but None (ignored)
+    }
+
+    #[test]
+    fn test_create_default_config_content() {
+        // Verify the default config content is valid and parseable
+        let config = parse_config_str(DEFAULT_CONFIG_CONTENT);
+        assert_eq!(config.multiplexer, Some("tmux".to_string()));
+        assert_eq!(config.auto_attach, Some(true));
+    }
+
+    #[test]
+    fn test_create_default_config_content_includes_comments() {
+        // Verify comments are preserved in the default config
+        assert!(DEFAULT_CONFIG_CONTENT.contains("# CodeMux configuration file"));
+        assert!(DEFAULT_CONFIG_CONTENT.contains("# Preferred multiplexer"));
+        assert!(DEFAULT_CONFIG_CONTENT.contains("# Whether to auto-attach"));
     }
 }

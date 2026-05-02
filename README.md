@@ -31,8 +31,8 @@ This project follows the same lean approach as [`th0jensen/fff-gpui`](https://gi
 |---|---|
 | **Pure native binary, no Zed extension** | Zed's extension API doesn't expose terminal-profile hooks (yet). Going binary-first is simpler, faster, and works today. |
 | **Zed integration via user config** | Use Zed's existing `settings.json` / `tasks.json` / `keymap.json` — no new APIs to learn, no extension manifests, no marketplace review. |
-| **One Rust crate, one binary** | No `[lib]`, no WASM target, no `extension.toml`. Just `cargo build --release`. |
-| **Minimal dependencies** | `clap`, `which`, `serde`, `toml`, `anyhow`, `regex`, `dirs`. That's it. |
+| **One Rust crate, one binary** | No `[lib]`, no WASM target. Just `cargo build --release`. |
+| **Zero dependencies** | Pure stdlib — no external crates for the core CLI. |
 | **`exec` model** | Replaces itself with the multiplexer process — no lingering parent. |
 
 ```diagram
@@ -61,7 +61,6 @@ This project follows the same lean approach as [`th0jensen/fff-gpui`](https://gi
 - Per-workspace `.codemux.toml` overrides → deferred to v2.
 - Pane / layout management.
 - Multi-root workspace handling.
-- Zed extension manifest / marketplace listing — intentionally out of scope; this is a CLI binary by design.
 
 ---
 
@@ -76,7 +75,30 @@ brew tap jellydn/tap
 brew install codemux
 ```
 
+### Prebuilt binaries
+
+Download prebuilt binaries from [GitHub Releases](https://github.com/jellydn/zed-codemux/releases):
+
+```bash
+# macOS (Apple Silicon)
+curl -L -o codemux https://github.com/jellydn/zed-codemux/releases/latest/download/codemux-macos-arm64
+chmod +x codemux
+sudo mv codemux /usr/local/bin/
+
+# macOS (Intel)
+curl -L -o codemux https://github.com/jellydn/zed-codemux/releases/latest/download/codemux-macos-x64
+chmod +x codemux
+sudo mv codemux /usr/local/bin/
+
+# Linux (x64)
+curl -L -o codemux https://github.com/jellydn/zed-codemux/releases/latest/download/codemux-linux-x64
+chmod +x codemux
+sudo mv codemux /usr/local/bin/
+```
+
 ### Build from source
+
+Requires Rust stable:
 
 ```sh
 git clone https://github.com/jellydn/zed-codemux
@@ -84,7 +106,7 @@ cd zed-codemux
 cargo build --release
 ```
 
-The binary will be at `target/release/codemux`. Move it onto your `$PATH` or reference it by absolute path:
+The binary will be at `target/release/codemux`. Move it onto your `$PATH`:
 
 ```sh
 install -m 0755 target/release/codemux /usr/local/bin/codemux
@@ -169,6 +191,16 @@ Detection order:
 multiplexer = "tmux"     # or "zellij"
 auto_attach = true       # default true; same workspace ⇒ shared session
 ```
+
+### Quick setup with `--init`
+
+Create a default config file interactively:
+
+```bash
+codemux --init
+```
+
+This creates `~/.config/codemux/config.toml` with sensible defaults. The command will fail gracefully if the config already exists.
 
 ### Environment variables
 
