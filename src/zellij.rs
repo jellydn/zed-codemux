@@ -64,7 +64,9 @@ impl MuxLauncher for ZellijLauncher {
             format!("zellij attach {} -c", escaped_name)
         } else {
             // Always create new session
-            // Note: zellij doesn't have a -c option for setting cwd in this mode
+            // Note: zellij doesn't have a -c option for setting cwd in this mode.
+            // The _cwd parameter is intentionally ignored here - zellij will start
+            // in the current working directory. This differs from tmux behavior.
             format!("zellij -s {}", escaped_name)
         }
     }

@@ -14,6 +14,10 @@ rust-version = "1.70"
 name = "codemux"
 path = "src/main.rs"
 
+[workspace]
+members = ["extension"]
+resolver = "2"
+
 [dependencies]
 
 

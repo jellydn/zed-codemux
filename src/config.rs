@@ -104,7 +104,9 @@ fn get_config_path() -> PathBuf {
 
 /// Parses a minimal TOML-like config string for our specific format.
 ///
-/// NOTE: This is a simplified parser that only supports basic key-value pairs.
+/// NOTE: This is a simplified, lenient parser that only supports basic key-value pairs.
+/// It intentionally deviates from strict TOML to be more user-friendly for simple configs.
+///
 /// It does NOT support:
 ///   - Arrays, tables, or inline tables
 ///   - Escaped characters in strings
@@ -112,12 +114,14 @@ fn get_config_path() -> PathBuf {
 ///   - Dotted keys
 ///
 /// Supported formats:
-///   multiplexer = "value"   (or 'value')
+///   multiplexer = "value"   (or 'value', or bare words like `tmux`)
 ///   auto_attach = true/false/yes/no/1/0
 ///
-/// Note on unquoted values: `multiplexer = tmux` (without quotes) will be
-/// parsed as the string "tmux" after trimming - this is acceptable for
-/// our use case since we strip quotes anyway, but differs from strict TOML.
+/// Lenient parsing behavior:
+///   - Unquoted values like `multiplexer = tmux` are accepted and treated as strings
+///   - Values are trimmed and quotes are stripped automatically
+///   - This differs from strict TOML where bare words would be invalid
+///   - If you need strict TOML compliance, quote all string values
 ///
 /// Returns defaults if parsing fails.
 pub fn parse_config_str(contents: &str) -> Config {
