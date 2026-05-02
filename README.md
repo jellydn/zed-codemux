@@ -31,8 +31,8 @@ This project follows the same lean approach as [`th0jensen/fff-gpui`](https://gi
 |---|---|
 | **Pure native binary, no Zed extension** | Zed's extension API doesn't expose terminal-profile hooks (yet). Going binary-first is simpler, faster, and works today. |
 | **Zed integration via user config** | Use Zed's existing `settings.json` / `tasks.json` / `keymap.json` — no new APIs to learn, no extension manifests, no marketplace review. |
-| **One Rust crate, one binary** | No `[lib]`, no WASM target, no `extension.toml`. Just `cargo build --release`. |
-| **Minimal dependencies** | `clap`, `which`, `serde`, `toml`, `anyhow`, `regex`, `dirs`. That's it. |
+| **One Rust crate, one binary** | No `[lib]`, no WASM target. Just `cargo build --release`. |
+| **Zero dependencies** | Pure stdlib — no external crates for the core CLI. |
 | **`exec` model** | Replaces itself with the multiplexer process — no lingering parent. |
 
 ```diagram
@@ -61,13 +61,44 @@ This project follows the same lean approach as [`th0jensen/fff-gpui`](https://gi
 - Per-workspace `.codemux.toml` overrides → deferred to v2.
 - Pane / layout management.
 - Multi-root workspace handling.
-- Zed extension manifest / marketplace listing — intentionally out of scope; this is a CLI binary by design.
 
 ---
 
 ## Installation
 
-Build from source (only path supported in v1, mirroring `fff-gpui`):
+### Homebrew (macOS & Linux)
+
+The easiest way to install codemux on macOS and Linux:
+
+```bash
+brew tap jellydn/tap
+brew install codemux
+```
+
+### Prebuilt binaries
+
+Download prebuilt binaries from [GitHub Releases](https://github.com/jellydn/zed-codemux/releases):
+
+```bash
+# macOS (Apple Silicon)
+curl -L -o codemux https://github.com/jellydn/zed-codemux/releases/latest/download/codemux-macos-arm64
+chmod +x codemux
+sudo mv codemux /usr/local/bin/
+
+# macOS (Intel)
+curl -L -o codemux https://github.com/jellydn/zed-codemux/releases/latest/download/codemux-macos-x64
+chmod +x codemux
+sudo mv codemux /usr/local/bin/
+
+# Linux (x64)
+curl -L -o codemux https://github.com/jellydn/zed-codemux/releases/latest/download/codemux-linux-x64
+chmod +x codemux
+sudo mv codemux /usr/local/bin/
+```
+
+### Build from source
+
+Requires Rust stable:
 
 ```sh
 git clone https://github.com/jellydn/zed-codemux
@@ -75,13 +106,11 @@ cd zed-codemux
 cargo build --release
 ```
 
-The binary will be at `target/release/codemux`. Move it onto your `$PATH` or reference it by absolute path:
+The binary will be at `target/release/codemux`. Move it onto your `$PATH`:
 
 ```sh
 install -m 0755 target/release/codemux /usr/local/bin/codemux
 ```
-
-> Future v1.x will add `cargo install codemux`, a Homebrew tap, and prebuilt GitHub Release binaries.
 
 ---
 
@@ -147,6 +176,20 @@ Now `Cmd+J` summons a terminal already attached to the current workspace's tmux/
 
 ---
 
+## CLI usage
+
+```bash
+codemux [OPTIONS] [ARGS]...
+
+Arguments:
+  [ARGS]...  Additional arguments to pass to the shell
+
+Options:
+  -h, --help     Print help
+      --init     Create default config file at ~/.config/codemux/config.toml
+  -V, --version  Print version
+```
+
 ## Configuration
 
 ### Choose a multiplexer
@@ -162,6 +205,16 @@ Detection order:
 multiplexer = "tmux"     # or "zellij"
 auto_attach = true       # default true; same workspace ⇒ shared session
 ```
+
+### Quick setup with `--init`
+
+Create a default config file interactively:
+
+```bash
+codemux --init
+```
+
+This creates `~/.config/codemux/config.toml` with sensible defaults. The command will fail gracefully if the config already exists.
 
 ### Environment variables
 
@@ -208,6 +261,8 @@ When `auto_attach = false`, CodeMux finds the **first available** suffixed name 
 | Always-new | `tmux new-session -s <name> -c <cwd>` | `zellij -s <name>` |
 | List sessions | `tmux list-sessions -F '#{session_name}'` | `zellij list-sessions -n` |
 
+> **Note on zellij CWD behavior:** When `auto_attach = false` (always-new mode), zellij starts in the current working directory since it lacks a `-c` option for explicit CWD. This differs from tmux which always respects the `-c` flag.
+
 ---
 
 ## Requirements
@@ -227,20 +282,22 @@ When `auto_attach = false`, CodeMux finds the **first available** suffixed name 
 ├── Cargo.toml
 ├── Cargo.lock
 ├── src/
-│   ├── main.rs                  ← entry point, exec dispatch
-│   ├── sanitize.rs              ← session-name sanitization
-│   ├── shell_escape.rs          ← POSIX shell escape
-│   ├── config.rs                ← TOML config loader
+│   ├── main.rs                  ← entry point, exec dispatch, shell escape, MuxLauncher trait
+│   ├── sanitize.rs              ← session-name sanitization + getUniqueSessionName
+│   ├── config.rs                ← TOML config loader + create_default_config()
 │   ├── detect.rs                ← multiplexer detection
-│   ├── launcher.rs              ← MuxLauncher trait
 │   ├── tmux.rs                  ← tmux implementation
-│   ├── zellij.rs                ← zellij implementation
-│   └── unique_name.rs           ← getUniqueSessionName
+│   └── zellij.rs                ← zellij implementation
+├── extension/                   ← Zed extension for discoverability
+│   ├── Cargo.toml
+│   ├── extension.toml
+│   └── src/lib.rs
 ├── .zed/
 │   └── tasks.json               ← project-local "Build and run codemux" task
 ├── .github/
 │   └── workflows/
-│       └── ci.yml               ← cross-platform CI
+│       ├── ci.yml               ← cross-platform CI
+│       └── release.yml          ← prebuilt binary releases
 ├── tasks/
 │   └── prd-zed-mux.md           ← full PRD
 └── scripts/
@@ -266,9 +323,9 @@ The repo includes a `.zed/tasks.json` with a one-key build-and-run task, mirrori
 
 | | vscode-mux | codemux for Zed |
 |---|---|---|
-| Distribution | VS Code Marketplace + Open VSX | Source build (`cargo build --release`) |
+| Distribution | VS Code Marketplace + Open VSX | Homebrew, GitHub Releases, source build |
 | Hook into editor | VS Code `TerminalProfile` API | Zed `settings.json terminal.shell.program` *or* `tasks.json` + keymap |
-| Implementation | TypeScript (Reactive VS Code) | Rust binary, exec-style replacement |
+| Implementation | TypeScript (Reactive VS Code) | Rust binary, zero dependencies, exec-style replacement |
 | Kill command | ✅ Command palette | ❌ v1 — use native `tmux/zellij kill-session` |
 | Multi-root workspaces | ✅ first folder | ❌ v1 — uses Zed's terminal CWD |
 | Session naming, sanitization, indexing | identical | identical (verified by shared fixture tests) |
@@ -281,8 +338,8 @@ See [`tasks/prd-zed-mux.md`](tasks/prd-zed-mux.md) for the full PRD and [`script
 
 | Version | Highlights |
 |---|---|
-| **v1.0** | Drop-in CLI binary, vscode-mux parity (sanitization + indexing + commands), source build, two Zed integration patterns |
-| **v1.1** | `cargo install codemux`, Homebrew tap, prebuilt GitHub Release binaries |
+| **v1.0** | Drop-in CLI binary, vscode-mux parity (sanitization + indexing + commands), source build, two Zed integration patterns, Homebrew tap, prebuilt GitHub Release binaries, `--init` flag |
+| **v1.1** | `cargo install codemux`; Zed extension marketplace listing |
 | **v2.0** | `codemux kill <name>` subcommand; per-workspace `.codemux.toml`; optional Zed extension manifest if/when Zed adds terminal-profile API |
 
 ---

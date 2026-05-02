@@ -2,7 +2,7 @@
 name = "codemux"
 version = "0.1.0"
 edition = "2021"
-authors = ["jellydn"]
+authors = ["jellydn <dung@productsway.com>"]
 description = "Drop-in CLI binary that opens Zed terminals inside tmux or zellij — port of vscode-mux to Zed"
 license = "MIT"
 repository = "https://github.com/jellydn/zed-codemux"
@@ -14,19 +14,26 @@ rust-version = "1.70"
 name = "codemux"
 path = "src/main.rs"
 
+[workspace]
+members = ["extension"]
+resolver = "2"
+
 [dependencies]
-clap = { version = "4.5", features = ["derive"] }
-which = "6.0"
-serde = { version = "1.0", features = ["derive"] }
-toml = "0.8"
-anyhow = "1.0"
-dirs = "5.0"
-regex = "1.10"
+
+
+
+
+
+
 
 [dev-dependencies]
 tempfile = "3.10"
 
 [profile.release]
-opt-level = 3
+opt-level = "s"
 lto = true
 strip = true
+panic = "abort"
+codegen-units = 1
+overflow-checks = false
+

@@ -10,7 +10,7 @@ pub enum Multiplexer {
 impl Multiplexer {
     /// Parses a multiplexer name string into a Multiplexer enum.
     /// Returns None if the name doesn't match "tmux" or "zellij".
-    fn from_name(name: &str) -> Option<Self> {
+    pub(crate) fn from_name(name: &str) -> Option<Self> {
         match name.to_lowercase().as_str() {
             "tmux" => Some(Multiplexer::Tmux),
             "zellij" => Some(Multiplexer::Zellij),
@@ -19,16 +19,54 @@ impl Multiplexer {
     }
 }
 
-/// Detects which multiplexer to use, following the priority order:
-/// 1. Environment variable `CODEMUX_MULTIPLEXER`
-/// 2. Config file `multiplexer` field
-/// 3. PATH probe (prefer tmux, then zellij)
+/// Checks if a binary exists in PATH by searching through PATH directories.
+fn find_in_path(binary: &str) -> bool {
+    let path_env = std::env::var("PATH").unwrap_or_default();
+    let path_sep = if cfg!(windows) { ';' } else { ':' };
+    find_in_path_with_env(binary, &path_env, path_sep)
+}
+
+/// Testable version of find_in_path that accepts explicit PATH env string.
+pub(crate) fn find_in_path_with_env(binary: &str, path_env: &str, path_sep: char) -> bool {
+    for dir in path_env.split(path_sep) {
+        if dir.is_empty() {
+            continue;
+        }
+        let full_path = std::path::Path::new(dir).join(binary);
+
+        // On Windows, also check for .exe extension if not already present
+        #[cfg(windows)]
+        {
+            if !binary.ends_with(".exe") {
+                let with_exe = std::path::Path::new(dir).join(format!("{}.exe", binary));
+                if with_exe.is_file() {
+                    return true;
+                }
+            }
+        }
+
+        if full_path.is_file() {
+            return true;
+        }
+    }
+
+    false
+}
+
+/// Core detection logic using a provided environment lookup.
+/// The env_lookup closure takes a var name and returns its value if present.
 ///
-/// Returns `None` if no multiplexer is found.
-#[allow(dead_code)]
-pub fn detect_multiplexer(config: &Config) -> Option<Multiplexer> {
+/// NOTE: The PATH-based fallback (`find_in_path`) is not testable via the
+/// env_lookup injection since it reads PATH directly. This is intentional:
+/// all existing tests provide env/config values, so they return before PATH
+/// probing. Making PATH testable would require additional abstraction overhead
+/// for little practical benefit in current test scenarios.
+pub(crate) fn detect_with_env_lookup(
+    config: &Config,
+    env_lookup: impl Fn(&str) -> Option<String>,
+) -> Option<Multiplexer> {
     // Priority 1: Check environment variable
-    if let Ok(env_mux) = std::env::var("CODEMUX_MULTIPLEXER") {
+    if let Some(env_mux) = env_lookup("CODEMUX_MULTIPLEXER") {
         if let Some(mux) = Multiplexer::from_name(&env_mux) {
             return Some(mux);
         }
@@ -41,13 +79,13 @@ pub fn detect_multiplexer(config: &Config) -> Option<Multiplexer> {
         }
     }
 
-    // Priority 3: Probe PATH via `which` crate
+    // Priority 3: Probe PATH directly
     // Prefer tmux first, then zellij
-    if which::which("tmux").is_ok() {
+    if find_in_path("tmux") {
         return Some(Multiplexer::Tmux);
     }
 
-    if which::which("zellij").is_ok() {
+    if find_in_path("zellij") {
         return Some(Multiplexer::Zellij);
     }
 
@@ -55,166 +93,12 @@ pub fn detect_multiplexer(config: &Config) -> Option<Multiplexer> {
     None
 }
 
-/// Detects which multiplexer to use, with explicit environment variable injection.
-/// This helper is useful for testing to avoid mutating the real environment.
-#[allow(dead_code)]
-pub fn detect_multiplexer_with_env(
-    config: &Config,
-    env: &std::collections::HashMap<String, String>,
-) -> Option<Multiplexer> {
-    // Priority 1: Check environment variable
-    if let Some(env_mux) = env.get("CODEMUX_MULTIPLEXER") {
-        if let Some(mux) = Multiplexer::from_name(env_mux) {
-            return Some(mux);
-        }
-    }
-
-    // Priority 2: Check config file
-    if let Some(ref config_mux) = config.multiplexer {
-        if let Some(mux) = Multiplexer::from_name(config_mux) {
-            return Some(mux);
-        }
-    }
-
-    // Priority 3: Probe PATH via `which` crate
-    // Prefer tmux first, then zellij
-    if which::which("tmux").is_ok() {
-        return Some(Multiplexer::Tmux);
-    }
-
-    if which::which("zellij").is_ok() {
-        return Some(Multiplexer::Zellij);
-    }
-
-    // No multiplexer found
-    None
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::collections::HashMap;
-
-    #[test]
-    fn test_env_var_tmux() {
-        let mut env = HashMap::new();
-        env.insert("CODEMUX_MULTIPLEXER".to_string(), "tmux".to_string());
-        let config = Config::default();
-
-        let result = detect_multiplexer_with_env(&config, &env);
-        assert_eq!(result, Some(Multiplexer::Tmux));
-    }
-
-    #[test]
-    fn test_env_var_zellij() {
-        let mut env = HashMap::new();
-        env.insert("CODEMUX_MULTIPLEXER".to_string(), "zellij".to_string());
-        let config = Config::default();
-
-        let result = detect_multiplexer_with_env(&config, &env);
-        assert_eq!(result, Some(Multiplexer::Zellij));
-    }
-
-    #[test]
-    fn test_env_var_case_insensitive() {
-        let mut env = HashMap::new();
-        env.insert("CODEMUX_MULTIPLEXER".to_string(), "TMUX".to_string());
-        let config = Config::default();
-
-        let result = detect_multiplexer_with_env(&config, &env);
-        assert_eq!(result, Some(Multiplexer::Tmux));
-    }
-
-    #[test]
-    fn test_env_var_invalid_falls_through() {
-        // Invalid env var should fall through to config
-        let mut env = HashMap::new();
-        env.insert("CODEMUX_MULTIPLEXER".to_string(), "invalid".to_string());
-        let config = Config {
-            multiplexer: Some("zellij".to_string()),
-            auto_attach: None,
-        };
-
-        let result = detect_multiplexer_with_env(&config, &env);
-        assert_eq!(result, Some(Multiplexer::Zellij));
-    }
-
-    #[test]
-    fn test_config_tmux() {
-        let env = HashMap::new();
-        let config = Config {
-            multiplexer: Some("tmux".to_string()),
-            auto_attach: None,
-        };
-
-        let result = detect_multiplexer_with_env(&config, &env);
-        assert_eq!(result, Some(Multiplexer::Tmux));
-    }
-
-    #[test]
-    fn test_config_zellij() {
-        let env = HashMap::new();
-        let config = Config {
-            multiplexer: Some("zellij".to_string()),
-            auto_attach: None,
-        };
-
-        let result = detect_multiplexer_with_env(&config, &env);
-        assert_eq!(result, Some(Multiplexer::Zellij));
-    }
-
-    #[test]
-    fn test_env_overrides_config() {
-        // Env var should take priority over config
-        let mut env = HashMap::new();
-        env.insert("CODEMUX_MULTIPLEXER".to_string(), "tmux".to_string());
-        let config = Config {
-            multiplexer: Some("zellij".to_string()),
-            auto_attach: None,
-        };
-
-        let result = detect_multiplexer_with_env(&config, &env);
-        assert_eq!(result, Some(Multiplexer::Tmux));
-    }
-
-    #[test]
-    fn test_config_overrides_path() {
-        // Config should be used when env is not set (we can't easily test PATH probing,
-        // but we verify that with env unset and config set, we get the config value)
-        let env = HashMap::new();
-        let config = Config {
-            multiplexer: Some("zellij".to_string()),
-            auto_attach: None,
-        };
-
-        let result = detect_multiplexer_with_env(&config, &env);
-        assert_eq!(result, Some(Multiplexer::Zellij));
-    }
-
-    #[test]
-    fn test_default_config_no_env() {
-        let env = HashMap::new();
-        let config = Config::default();
-
-        // This will probe PATH - result depends on host system
-        // We can't assert a specific value, but we can ensure it doesn't panic
-        let _result = detect_multiplexer_with_env(&config, &env);
-    }
-
-    #[test]
-    fn test_multiplexer_enum_equality() {
-        assert_eq!(Multiplexer::Tmux, Multiplexer::Tmux);
-        assert_eq!(Multiplexer::Zellij, Multiplexer::Zellij);
-        assert_ne!(Multiplexer::Tmux, Multiplexer::Zellij);
-    }
-
-    #[test]
-    fn test_multiplexer_from_name() {
-        assert_eq!(Multiplexer::from_name("tmux"), Some(Multiplexer::Tmux));
-        assert_eq!(Multiplexer::from_name("zellij"), Some(Multiplexer::Zellij));
-        assert_eq!(Multiplexer::from_name("TMUX"), Some(Multiplexer::Tmux));
-        assert_eq!(Multiplexer::from_name("ZELLIJ"), Some(Multiplexer::Zellij));
-        assert_eq!(Multiplexer::from_name("invalid"), None);
-        assert_eq!(Multiplexer::from_name(""), None);
-    }
+/// Detects which multiplexer to use, following the priority order:
+/// 1. Environment variable `CODEMUX_MULTIPLEXER`
+/// 2. Config file `multiplexer` field
+/// 3. PATH probe (prefer tmux, then zellij)
+///
+/// Returns `None` if no multiplexer is found.
+pub fn detect_multiplexer(config: &Config) -> Option<Multiplexer> {
+    detect_with_env_lookup(config, |name| std::env::var(name).ok())
 }

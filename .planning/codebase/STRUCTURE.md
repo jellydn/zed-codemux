@@ -5,126 +5,115 @@
 ## Directory Layout
 
 ```
-./
-├── .github/workflows/    # CI/CD configuration
-├── .planning/            # Planning documentation (this codemap)
-├── .zed/                 # Zed editor configuration
-├── assets/               # Static assets (logo, etc.)
-├── docs/                 # Additional documentation
-├── scripts/ralph/        # Ralph autonomous agent scripts
-├── src/                  # Rust source code
-├── tasks/                # Task definitions
-├── target/               # Cargo build artifacts (gitignored)
-├── AGENTS.md             # Agent development guidelines
-├── Cargo.lock            # Dependency lockfile
-├── Cargo.toml            # Package manifest
-├── CLAUDE.md             # Claude-specific notes
-├── justfile              # Task runner recipes
-├── LICENSE               # MIT License
-├── prek.toml             # Pre-commit hooks config
-├── progress.md           # Ralph progress tracking
-├── README.md             # Project documentation
-└── .gitignore            # Git ignore rules
+/Users/huynhdung/conductor/workspaces/2026-05-01-zed-codemux/brisbane/
+├── src/                         # Main CLI source code
+│   ├── main.rs                  # Entry point, MuxLauncher trait, exec dispatch
+│   ├── config.rs                # TOML configuration loading and parsing
+│   ├── detect.rs                # Multiplexer detection (env/config/PATH)
+│   ├── sanitize.rs              # Session name sanitization and unique name generation
+│   ├── tmux.rs                  # TmuxLauncher implementation
+│   └── zellij.rs                # ZellijLauncher implementation
+├── extension/                   # Zed extension (separate crate)
+│   ├── src/
+│   │   └── lib.rs               # Extension entry point (stub)
+│   ├── Cargo.toml               # Extension dependencies (zed_extension_api)
+│   └── extension.toml           # Zed extension manifest
+├── scripts/                     # Build/utility scripts
+│   └── ralph/
+│       └── src/main.rs          # Ralph script placeholder
+├── Cargo.toml                   # Main crate manifest
+├── Cargo.lock                   # Dependency lock file
+├── README.md                    # User documentation
+├── LICENSE                      # MIT license
+├── justfile                     # Just command runner recipes
+└── .zed/                        # Zed editor configuration
+    └── tasks.json               # Project-local build tasks
 ```
 
 ## Directory Purposes
 
 **src/:**
-- Purpose: All Rust source code
-- Contains: 8 source files (main.rs + 7 modules)
-- Key files: `src/main.rs` (entry), `src/launcher.rs` (trait), `src/tmux.rs`, `src/zellij.rs`
+- Purpose: Core CLI implementation
+- Contains: All Rust modules for the codemux binary
+- Key files: `main.rs` (entry), `config.rs`, `detect.rs`, `sanitize.rs`, `tmux.rs`, `zellij.rs`
 
-**.github/workflows/:**
-- Purpose: GitHub Actions CI configuration
-- Contains: `ci.yml` - Matrix builds for Ubuntu, macOS, Windows
+**extension/:**
+- Purpose: Zed extension packaging (future-proofing)
+- Contains: WASM-compilable extension code, manifests
+- Key files: `src/lib.rs`, `Cargo.toml`, `extension.toml`
 
-**scripts/ralph/:**
-- Purpose: Ralph autonomous agent tooling
-- Contains: `src/main.rs` - Agent implementation
+**scripts/:**
+- Purpose: Auxiliary tooling
+- Contains: Ralph autonomous agent integration placeholder
 
-**docs/:**
-- Purpose: Additional project documentation
-- Contains: Reference materials
-
-**assets/:**
-- Purpose: Static assets
-- Contains: Logo and branding files
+**.zed/:**
+- Purpose: Editor-specific configuration
+- Contains: tasks.json for "Build and run codemux" task
 
 ## Key File Locations
 
 **Entry Points:**
-- `src/main.rs`: CLI entry point, argument parsing, main orchestration
+- `/Users/huynhdung/conductor/workspaces/2026-05-01-zed-codemux/brisbane/src/main.rs`: CLI binary entry point
+- `/Users/huynhdung/conductor/workspaces/2026-05-01-zed-codemux/brisbane/extension/src/lib.rs`: Zed extension entry point
 
 **Configuration:**
-- `Cargo.toml`: Package manifest, dependencies, release profile
-- `justfile`: Task runner definitions
-- `prek.toml`: Pre-commit hook configuration
+- `~/.config/codemux/config.toml`: User configuration file (runtime)
+- `/Users/huynhdung/conductor/workspaces/2026-05-01-zed-codemux/brisbane/Cargo.toml`: Main crate manifest (dependencies, binary target, release profile)
+- `/Users/huynhdung/conductor/workspaces/2026-05-01-zed-codemux/brisbane/extension/Cargo.toml`: Extension crate manifest
 
 **Core Logic:**
-- `src/main.rs`: Main flow, setting resolution, process execution
-- `src/config.rs`: Config loading and parsing
-- `src/detect.rs`: Multiplexer detection logic
-- `src/sanitize.rs`: Session name sanitization
-- `src/launcher.rs`: `MuxLauncher` trait definition
-- `src/tmux.rs`: Tmux implementation
-- `src/zellij.rs`: Zellij implementation
-- `src/shell_escape.rs`: POSIX shell escaping utility
+- `/Users/huynhdung/conductor/workspaces/2026-05-01-zed-codemux/brisbane/src/main.rs`: MuxLauncher trait definition, orchestration, exec dispatch
+- `/Users/huynhdung/conductor/workspaces/2026-05-01-zed-codemux/brisbane/src/tmux.rs`: Tmux command builder and session listing
+- `/Users/huynhdung/conductor/workspaces/2026-05-01-zed-codemux/brisbane/src/zellij.rs`: Zellij command builder and session listing
 
 **Testing:**
-- Tests are inline in each source file under `#[cfg(test)]` modules
-- `cargo test` runs all tests
+- Inline `#[cfg(test)]` modules in each .rs file (idomatic Rust)
 
 ## Naming Conventions
 
 **Files:**
-- `snake_case.rs` for source files
-- Module name matches filename (e.g., `config.rs` → `mod config`)
+- `snake_case.rs`: Module names (config.rs, detect.rs, sanitize.rs)
+- Module name matches file name (e.g., `mod config;` in `config.rs`)
 
 **Directories:**
-- `snake_case` for directory names
-- Standard Rust project layout
+- `lowercase/`: Directory names (src/, extension/, scripts/)
 
-**Structs/Enums:**
-- `PascalCase`: `TmuxLauncher`, `Multiplexer`, `Config`
-
-**Functions:**
-- `snake_case`: `load_config()`, `detect_multiplexer()`
-
-**Constants:**
-- No prominent constants in this codebase
-
-**Traits:**
-- `PascalCase`: `MuxLauncher`
+**Types:**
+- `PascalCase`: Structs and traits (TmuxLauncher, MuxLauncher, Config)
+- `snake_case`: Functions and variables (load_config, detect_multiplexer)
+- `UPPER_SNAKE_CASE`: Constants (VERSION from CARGO_PKG_VERSION)
 
 ## Where to Add New Code
 
 **New Multiplexer Support:**
-- Implementation: `src/<multiplexer>.rs`
-- Add to `detect.rs`: Detection logic and enum variant
-- Add to `main.rs`: Match arm in main flow
+- Implementation: `src/<multiplexer>.rs` following TmuxLauncher/ZellijLauncher pattern
+- Registration: Add variant to `detect.rs` Multiplexer enum
+- Integration: Update `main.rs` match arms in `main()` function
 
 **New Configuration Options:**
-- Add field to `Config` struct in `src/config.rs`
-- Add resolution logic in `src/main.rs`
-- Update config template in documentation
-
-**New CLI Options:**
-- Add to `Cli` struct in `src/main.rs` (clap derive)
+- Schema: Add field to `Config` struct in `src/config.rs`
+- Parsing: Update `parse_config_str()` in same file
+- Usage: Access via `main.rs` resolution functions
 
 **Utilities:**
-- Shared helpers: `src/` as new module or add to existing utility module
+- Shared helpers: Add to `main.rs` (shell_escape) or appropriate module
 
 ## Special Directories
 
 **target/:**
 - Purpose: Cargo build artifacts
 - Generated: Yes (by cargo build)
-- Committed: No (in `.gitignore`)
+- Committed: No (in .gitignore)
 
-**.planning/:**
-- Purpose: Planning and documentation
-- Generated: No (manually created)
-- Committed: Optional
+**extension/target/:**
+- Purpose: Extension crate build artifacts
+- Generated: Yes
+- Committed: No
+
+**.context/:**
+- Purpose: Claude Code context files
+- Generated: Yes
+- Committed: Yes (tracked in repo)
 
 ---
 

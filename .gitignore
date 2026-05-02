@@ -1,5 +1,6 @@
 # Rust build artifacts
 /target
+extension/target
 
 # Cargo.lock is kept for binary crates to ensure reproducible builds
 

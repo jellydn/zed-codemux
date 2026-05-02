@@ -5,79 +5,99 @@
 ## Languages
 
 **Primary:**
-- Rust (Edition 2021, MSRV 1.70) - Entire codebase
+- Rust (Edition 2021, Minimum Rust Version 1.70) - Main CLI binary implementation (`src/*.rs`)
+- TOML - Configuration files (`Cargo.toml`, `config.toml`, `prek.toml`, `extension.toml`)
 
 **Secondary:**
-- TOML - Configuration files (`Cargo.toml`, `config.toml`)
-- YAML - CI/CD workflows (`.github/workflows/ci.yml`)
-- Shell - Justfile task runner recipes
+- YAML - CI/CD workflow definitions (`.github/workflows/*.yml`)
+- Shell (Just) - Task runner scripts (`justfile`)
 
 ## Runtime
 
 **Environment:**
-- Rust native binary (no runtime required)
+- Native binary (no runtime required)
 - Cross-platform: macOS, Linux, Windows
 
 **Package Manager:**
-- Cargo (built-in Rust package manager)
-- Lockfile: `Cargo.lock` present
+- Cargo - Rust package manager and build system
+- Lockfile: `Cargo.lock` present (version 3)
 
 ## Frameworks
 
 **Core:**
-- `clap` 4.5 - CLI argument parsing with derive macros
-- `serde` 1.0 - Serialization for config parsing
-- `anyhow` 1.0 - Error handling and propagation
-- `regex` 1.10 - Session name sanitization
+- Standard library only (`std::process`, `std::env`, `std::io`, `std::collections`)
+- No external runtime frameworks
 
 **Testing:**
-- Built-in `cargo test` with standard Rust test framework
-- `tempfile` 3.10 - Test utilities (dev dependency)
+- Built-in Rust test framework (`#[cfg(test)]` modules)
+- `tempfile` 3.27.0 - Temporary file/directory creation for tests
 
 **Build/Dev:**
-- `just` - Task runner (justfile for common commands)
-- `prek` - Git hooks framework for pre-commit checks
-- `cargo fmt` - Code formatting
-- `cargo clippy` - Linting (warnings as errors in CI)
+- Cargo - Build system (`cargo build`, `cargo test`)
+- Clippy - Linting (`cargo clippy`)
+- rustfmt - Code formatting (`cargo fmt`)
+- Just - Task runner (`just build`, `just test`, `just check`)
+- Prek - Git hooks framework (`prek run --all-files`)
 
 ## Key Dependencies
 
-**Critical:**
-- `clap` 4.5 - CLI parsing with derive macro support for clean command definitions
-- `which` 6.0 - PATH probing to detect tmux/zellij installations
-- `dirs` 5.0 - Cross-platform config directory detection
-- `regex` 1.10 - Session name sanitization (matches vscode-mux algorithm exactly)
+**Main Binary (`/Users/huynhdung/conductor/workspaces/2026-05-01-zed-codemux/brisbane/Cargo.toml`):**
+- None (zero runtime dependencies - pure std library)
 
-**Infrastructure:**
-- `serde` + `toml` 0.8 - Config file parsing
-- `anyhow` - Ergonomic error handling with `Result<T>`
+**Development Dependencies:**
+- `tempfile` 3.27.0 - Cross-platform temporary file utilities for testing
+
+**Extension (`/Users/huynhdung/conductor/workspaces/2026-05-01-zed-codemux/brisbane/extension/Cargo.toml`):**
+- `zed_extension_api` 0.1 - Zed editor extension API for WASM-based plugin
+
+**Build-time Dependencies (from `Cargo.lock`):**
+- `wit-bindgen` 0.51.0/0.57.1 - WIT bindings generation for WASM components
+- `wasm-encoder` 0.244.0 - WebAssembly binary encoding
+- `wasmparser` 0.244.0 - WebAssembly binary parsing
 
 ## Configuration
 
-**Environment:**
-- `CODEMUX_MULTIPLEXER` - Override preferred multiplexer (tmux/zellij)
-- `CODEMUX_AUTO_ATTACH` - Override auto-attach behavior (true/false)
-- `CODEMUX_DEBUG` - Enable debug logging (set to `1`)
-- `SHELL` / `COMSPEC` - Fallback shell detection
+**Environment Variables:**
+- `CODEMUX_MULTIPLEXER` - Force multiplexer selection (`tmux` or `zellij`)
+- `CODEMUX_AUTO_ATTACH` - Control session auto-attachment (`true`/`false`)
+- `CODEMUX_DEBUG` - Enable debug logging to stderr (`1` for enabled)
+- `SHELL` - Fallback shell path (Unix)
+- `COMSPEC` - Fallback shell path (Windows)
 - `XDG_CONFIG_HOME` - Config directory override
+- `HOME`/`APPDATA` - Platform-specific config directories
 
-**Build:**
-- `Cargo.toml` - Main manifest with release profile (LTO + strip)
-- `justfile` - Task definitions (build, test, clippy, fmt)
-- `prek.toml` - Pre-commit hooks configuration
+**Config Files:**
+- `~/.config/codemux/config.toml` - User configuration (multiplexer preference, auto_attach)
+- `Cargo.toml` - Build configuration with optimized release profile
+- `justfile` - Development task definitions
+- `prek.toml` - Git hook configuration (fmt, clippy, test)
+
+**Release Profile (`Cargo.toml` lines 28-35):**
+- `opt-level = "s"` - Optimize for size
+- `lto = true` - Link-time optimization enabled
+- `strip = true` - Strip symbols
+- `panic = "abort"` - Abort on panic
+- `codegen-units = 1` - Single codegen unit for maximum optimization
+- `overflow-checks = false` - Disable overflow checks in release
 
 ## Platform Requirements
 
 **Development:**
-- Rust 1.70 or later
-- tmux or zellij installed (optional, for testing)
-- just (optional, for task running)
-- prek (optional, for git hooks)
+- Rust toolchain (stable, >= 1.70)
+- `clippy` and `rustfmt` components
+- Just task runner (`cargo install just`)
+- Prek git hooks framework
 
 **Production:**
-- Target: Native binary executable
 - No runtime dependencies
-- Falls back to system shell if no multiplexer found
+- Requires `tmux` or `zellij` in PATH for multiplexer functionality
+- Falls back to system shell if neither multiplexer is available
+
+**Target Platforms:**
+- x86_64-unknown-linux-gnu (Linux x64)
+- x86_64-apple-darwin (macOS Intel)
+- aarch64-apple-darwin (macOS Apple Silicon)
+- x86_64-pc-windows-msvc (Windows x64)
 
 ---
 

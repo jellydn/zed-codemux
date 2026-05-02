@@ -2,17 +2,20 @@
 
 ## Architecture
 
-Single Rust crate, single `codemux` binary. No `[lib]`, no workspace.
+Single Rust crate, single `codemux` binary. No `[lib]` in main crate.
 
 ```
 src/main.rs         ← entry point, CLI parsing, exec dispatch, fallback shell
 src/config.rs        ← TOML config loader (~/.config/codemux/config.toml)
 src/detect.rs        ← Multiplexer detection (env → config → PATH)
 src/sanitize.rs      ← Session name sanitization + get_unique_session_name
-src/shell_escape.rs  ← POSIX shell-escape helper
-src/launcher.rs      ← MuxLauncher trait
 src/tmux.rs          ← tmux implementation
 src/zellij.rs        ← zellij implementation
+
+extension/           ← Zed extension for discoverability (separate crate)
+  Cargo.toml         ← cdylib crate type for Zed extension API
+  extension.toml     ← Zed extension manifest
+  src/lib.rs         ← Extension entry point
 ```
 
 Reference implementation: [vscode-mux](https://github.com/jellydn/vscode-mux) — session naming, sanitization, and multi-window indexing must match 1:1.
@@ -56,7 +59,7 @@ just lint           # prek run --all-files (same pre-commit hooks as CI)
 - **CI** (`.github/workflows/ci.yml`): builds + tests on ubuntu-latest, macos-latest, windows-latest. Runs clippy with `-D warnings` and `cargo fmt --check`.
 - **Pre-commit hooks** (`prek.toml`): runs `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo test` — matches CI exactly.
 
-> **Release workflow deferred to v1.1** — prebuilt binaries and release automation will be added when v1.1 is ready. For v1, build from source only (mirroring [fff-gpui](https://github.com/th0jensen/fff-gpui)).
+> **Release workflow added** — `.github/workflows/release.yml` builds and publishes binaries for macOS (x64, arm64), Linux (x64), and Windows (x64) on tag push.
 
 ## Ralph Automation
 

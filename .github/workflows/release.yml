@@ -1,0 +1,241 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build and Release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            binary_name: codemux
+            asset_name: codemux-linux-x64
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            binary_name: codemux
+            asset_name: codemux-macos-x64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            binary_name: codemux
+            asset_name: codemux-macos-arm64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            binary_name: codemux.exe
+            asset_name: codemux-windows-x64.exe
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Build release binary
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Strip binary (Unix)
+        if: matrix.os != 'windows-latest'
+        run: strip target/${{ matrix.target }}/release/${{ matrix.binary_name }}
+
+      - name: Create release archive
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp target/${{ matrix.target }}/release/${{ matrix.binary_name }} dist/${{ matrix.asset_name }}
+          cd dist
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            7z a ${{ matrix.asset_name }}.zip ${{ matrix.asset_name }}
+          else
+            tar czf ${{ matrix.asset_name }}.tar.gz ${{ matrix.asset_name }}
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset_name }}
+          path: dist/${{ matrix.asset_name }}${{ matrix.os == 'windows-latest' && '.zip' || '.tar.gz' }}
+
+  publish-crates-io:
+    name: Publish to crates.io
+    needs: build-and-release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Publish to crates.io
+        run: cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+  create-release:
+    name: Create Release
+    needs: [build-and-release, publish-crates-io]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Generate release notes
+        run: |
+          cat > release_notes.md << 'EOF'
+          ## Installation
+
+          ### Homebrew (macOS & Linux)
+          ```bash
+          brew tap jellydn/tap
+          brew install codemux
+          ```
+
+          ### Direct Download
+          Download the appropriate binary for your platform and place it in your `$PATH`:
+
+          ```bash
+          # macOS (Apple Silicon)
+          curl -L -o codemux https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/codemux-macos-arm64
+          chmod +x codemux
+          sudo mv codemux /usr/local/bin/
+
+          # macOS (Intel)
+          curl -L -o codemux https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/codemux-macos-x64
+          chmod +x codemux
+          sudo mv codemux /usr/local/bin/
+
+          # Linux (x64)
+          curl -L -o codemux https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/codemux-linux-x64
+          chmod +x codemux
+          sudo mv codemux /usr/local/bin/
+          ```
+
+          ### Build from source
+          ```bash
+          cargo install --git https://github.com/${{ github.repository }}
+          ```
+
+          ## Verify Installation
+          ```bash
+          codemux --version
+          codemux --help
+          ```
+          EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/*
+          body_path: release_notes.md
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref, '-alpha') || contains(github.ref, '-beta') || contains(github.ref, '-rc') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  update-homebrew-formula:
+    name: Update Homebrew Formula
+    needs: [build-and-release, create-release, publish-crates-io]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Calculate SHA256 checksums
+        id: checksums
+        run: |
+          cd dist
+          echo "macos_arm64=$(sha256sum codemux-macos-arm64.tar.gz | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+          echo "macos_x64=$(sha256sum codemux-macos-x64.tar.gz | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+          echo "linux_x64=$(sha256sum codemux-linux-x64.tar.gz | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+          echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Checkout homebrew-tap repository
+        uses: actions/checkout@v4
+        with:
+          repository: jellydn/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-tap
+
+      - name: Generate Homebrew formula
+        run: |
+          mkdir -p homebrew-tap/Formula
+          cat > homebrew-tap/Formula/codemux.rb << 'FORMULA'
+          class Codemux < Formula
+            desc "Drop-in CLI binary that opens Zed terminals inside tmux or zellij"
+            homepage "https://github.com/jellydn/zed-codemux"
+            version "${{ steps.checksums.outputs.version }}"
+            license "MIT"
+
+            on_macos do
+              on_arm do
+                url "https://github.com/jellydn/zed-codemux/releases/download/v${{ steps.checksums.outputs.version }}/codemux-macos-arm64.tar.gz"
+                sha256 "${{ steps.checksums.outputs.macos_arm64 }}"
+              end
+              on_intel do
+                url "https://github.com/jellydn/zed-codemux/releases/download/v${{ steps.checksums.outputs.version }}/codemux-macos-x64.tar.gz"
+                sha256 "${{ steps.checksums.outputs.macos_x64 }}"
+              end
+            end
+
+            on_linux do
+              on_intel do
+                url "https://github.com/jellydn/zed-codemux/releases/download/v${{ steps.checksums.outputs.version }}/codemux-linux-x64.tar.gz"
+                sha256 "${{ steps.checksums.outputs.linux_x64 }}"
+              end
+            end
+
+            def install
+              bin.install "codemux"
+            end
+
+            test do
+              system "#{bin}/codemux", "--version"
+            end
+          end
+          FORMULA
+
+      - name: Commit and push formula
+        run: |
+          cd homebrew-tap
+          git config user.name "GitHub Actions"
+          git config user.email "github-actions@github.com"
+          git add Formula/codemux.rb
+          git commit -m "codemux ${{ steps.checksums.outputs.version }}"
+          git push
+

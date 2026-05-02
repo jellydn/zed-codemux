@@ -4,142 +4,143 @@
 
 ## Pattern Overview
 
-**Overall:** Command Pattern with Trait-based Abstraction
+**Overall:** CLI Binary with Modular Plugin Architecture
 
 **Key Characteristics:**
-- Single binary with no library crate (`[[bin]]` only in `Cargo.toml`)
-- Platform-specific compilation with conditional code (`#[cfg(unix)]`, `#[cfg(windows)]`)
-- Process replacement model (`exec` on Unix) - no lingering parent process
-- Trait-based launcher abstraction for multiple multiplexer backends
-- Pure function design for testability with dependency injection
+- Single-purpose Rust binary that replaces itself with tmux/zellij via `exec()`
+- Trait-based abstraction for multiplexer implementations (Strategy pattern)
+- Configuration cascade: environment variables → config file → defaults
+- Zero external runtime dependencies (pure std library)
+- Cross-platform support (Unix, Windows) with platform-specific exec implementations
 
 ## Layers
 
-**CLI Layer:**
-- Purpose: Argument parsing and main orchestration
-- Location: `src/main.rs`
-- Contains: `Cli` struct (clap derive), `main()` function, setting resolution
-- Depends on: Config, Detect, Sanitize, Launcher traits
-- Used by: OS exec (entry point)
+**CLI/Presentation Layer:**
+- Purpose: Argument parsing, help/version display, initial orchestration
+- Location: `src/main.rs` (lines 38-68, 121-176)
+- Contains: `parse_args()`, `main()` function, process entry point
+- Depends on: config, detect, sanitize, tmux, zellij modules
+- Used by: User via shell, Zed terminal integration
 
 **Configuration Layer:**
-- Purpose: Load and parse user configuration
+- Purpose: Load and parse user preferences from TOML config file
 - Location: `src/config.rs`
-- Contains: `Config` struct, `load_config()`, `parse_config_str()`
-- Depends on: `serde`, `toml`, `dirs`
-- Used by: CLI layer for multiplexer and auto_attach settings
+- Contains: `Config` struct, `load_config()`, `parse_config_str()` - minimal TOML parser
+- Depends on: std::fs, std::path (platform-specific paths)
+- Used by: main.rs for multiplexer selection and auto_attach settings
 
 **Detection Layer:**
-- Purpose: Determine which multiplexer to use
+- Purpose: Determine which multiplexer to use based on priority cascade
 - Location: `src/detect.rs`
-- Contains: `Multiplexer` enum, `detect_multiplexer()`, `detect_multiplexer_with_env()`
-- Depends on: Config, `which` crate for PATH probing
-- Used by: CLI layer
+- Contains: `Multiplexer` enum, `detect_multiplexer()`, `find_in_path()`
+- Depends on: config module
+- Used by: main.rs to select launcher implementation
 
 **Sanitization Layer:**
 - Purpose: Convert workspace names to valid session names
 - Location: `src/sanitize.rs`
 - Contains: `sanitize_session_name()`, `get_unique_session_name()`
-- Depends on: `regex` crate
-- Used by: CLI layer before session creation
+- Depends on: std (no external deps)
+- Used by: main.rs for session naming before launching
 
-**Launcher Abstraction Layer:**
-- Purpose: Define common interface for multiplexers
-- Location: `src/launcher.rs`
-- Contains: `MuxLauncher` trait
-- Depends on: `anyhow::Result`
-- Used by: Tmux and Zellij implementations
-
-**Multiplexer Implementations:**
-- Purpose: Concrete launcher implementations
+**Multiplexer Implementation Layer:**
+- Purpose: Concrete implementations for tmux and zellij
 - Location: `src/tmux.rs`, `src/zellij.rs`
-- Contains: `TmuxLauncher`, `ZellijLauncher` structs
-- Depends on: `MuxLauncher` trait, `shell_escape`
-- Used by: CLI layer via dynamic dispatch
+- Contains: `TmuxLauncher`, `ZellijLauncher` structs implementing `MuxLauncher`
+- Depends on: main.rs (MuxLauncher trait), std::process::Command
+- Used by: main.rs via dynamic dispatch
 
-**Utilities:**
-- Purpose: Helper functions
-- Location: `src/shell_escape.rs`
-- Contains: `shell_escape()` for POSIX shell escaping
-- Depends on: std library only
-- Used by: Tmux, Zellij launchers
+**Extension Layer (Separate Crate):**
+- Purpose: Zed extension stub for future discoverability
+- Location: `extension/src/lib.rs`
+- Contains: `CodeMuxExtension` implementing Zed's `Extension` trait
+- Depends on: zed_extension_api
+- Used by: Zed editor (WASM target)
 
 ## Data Flow
 
 **Terminal Launch Flow:**
-1. Parse CLI arguments with clap (`Cli::parse()`)
-2. Get current working directory (`std::env::current_dir()`)
-3. Compute base session name from CWD basename
-4. Sanitize session name (regex-based replacement)
-5. Load config from `~/.config/codemux/config.toml`
-6. Detect multiplexer (env → config → PATH probe)
-7. Resolve settings (auto_attach, debug) with priority: env → config → default
-8. List existing sessions via multiplexer command
-9. Determine unique session name (with gap-filling)
-10. Build shell command string via `MuxLauncher::build_command()`
-11. Execute command via `exec_command()` (Unix exec or Windows spawn)
+1. Zed invokes `codemux` binary (via settings.json shell.program or tasks.json)
+2. `main()` parses CLI args (handles --help, --version)
+3. Load config from `~/.config/codemux/config.toml`
+4. Detect multiplexer: env var → config → PATH probe (tmux first, then zellij)
+5. Sanitize session name from current working directory basename
+6. Resolve `auto_attach` setting: env → config → default(true)
+7. List existing sessions via `MuxLauncher.list_sessions()`
+8. Compute unique session name (with gap-filling for multi-window)
+9. Build command string via `MuxLauncher.build_command()`
+10. `exec_command()` replaces process with shell executing the multiplexer command
 
 **State Management:**
-- No persistent state - all state derived from:
-  - Environment variables
-  - Config file
-  - Current working directory
-  - Active multiplexer sessions (queried at runtime)
+- No persistent state; all state derived at runtime from:
+  - Environment variables (CODEMUX_MULTIPLEXER, CODEMUX_AUTO_ATTACH, CODEMUX_DEBUG)
+  - Config file (optional ~/.config/codemux/config.toml)
+  - Running multiplexer sessions (queried via tmux/zellij list-sessions)
 
 ## Key Abstractions
 
 **MuxLauncher Trait:**
-- Purpose: Common interface for tmux and zellij operations
-- Pattern: Strategy pattern
+- Purpose: Abstract interface for terminal multiplexer operations
+- Location: `src/main.rs` (lines 16-23)
+- Pattern: Strategy pattern enabling polymorphic tmux/zellij handling
 - Methods: `list_sessions()`, `build_command()`
-- Implementations: `TmuxLauncher`, `ZellijLauncher`
 
 **Multiplexer Enum:**
 - Purpose: Type-safe representation of supported multiplexers
+- Location: `src/detect.rs` (lines 4-20)
+- Pattern: Enum with parsing from string names
 - Variants: `Tmux`, `Zellij`
-- Conversion: `from_name()` for string parsing (case-insensitive)
+
+**TmuxLauncher / ZellijLauncher:**
+- Purpose: Concrete implementations of MuxLauncher for each multiplexer
+- Location: `src/tmux.rs`, `src/zellij.rs`
+- Pattern: Struct with trait implementation
+- Differences: tmux uses `-c` for cwd; zellij uses `-c` flag on attach for create-if-missing
 
 **Config Struct:**
-- Purpose: Typed representation of TOML config
+- Purpose: Strongly typed configuration container
+- Location: `src/config.rs` (lines 4-10)
+- Pattern: Optional fields with default fallbacks
 - Fields: `multiplexer: Option<String>`, `auto_attach: Option<bool>`
-- Default: Both fields are `None` (use auto-detection and defaults)
 
 ## Entry Points
 
-**Main Binary:**
+**CLI Binary (codemux):**
 - Location: `src/main.rs`
-- Triggers: Direct execution from shell or Zed terminal profile
-- Responsibilities: CLI parsing, configuration resolution, multiplexer dispatch
+- Triggers: Direct shell invocation, Zed terminal.shell.program setting, Zed task::Spawn
+- Responsibilities: Full orchestration from arg parsing to exec()
 
-**Process Replacement:**
-- Location: `src/main.rs` - `exec_command()` function
-- Unix: Uses `CommandExt::exec()` to replace process with shell + multiplexer
-- Windows: Spawns and waits, then exits with child status code
+**Zed Extension:**
+- Location: `extension/src/lib.rs`
+- Triggers: Zed extension loading (WASM)
+- Responsibilities: Currently minimal stub - future discoverability hook
+
+**Test Entry Points:**
+- Location: Inline `#[cfg(test)]` modules in each source file
+- Triggers: `cargo test`
+- Responsibilities: Unit tests for sanitization, config parsing, detection logic, shell escaping
 
 ## Error Handling
 
-**Strategy:** `anyhow` for ergonomic error propagation
+**Strategy:** Graceful degradation with fallback chains
 
 **Patterns:**
-- Top-level `main() -> Result<()>` with `?` operator
-- Graceful degradation: missing multiplexer → fallback shell
-- Command failures: return empty session list rather than error (tmux/zellij not installed)
-- Config failures: return default Config (file missing or invalid TOML)
+- Config file missing/unreadable → use defaults
+- Multiplexer not found → fallback to $SHELL
+- Session listing fails → return empty Vec (assumes no sessions)
+- Platform-specific exec implementations with appropriate error propagation
+
+**Safety:**
+- Shell injection prevention via `shell_escape()` function (POSIX single-quote escaping)
+- Path traversal prevention via session name sanitization (non-alphanumeric replaced with -)
 
 ## Cross-Cutting Concerns
 
-**Logging:**
-- Conditional debug logging via `CODEMUX_DEBUG=1`
-- Prints to stderr with `[codemux]` prefix
-- No structured logging framework
+**Logging:** Debug logging to stderr via `CODEMUX_DEBUG=1` environment variable
 
-**Validation:**
-- Session name validation via regex sanitization
-- Multiplexer name validation via `from_name()` (case-insensitive)
-- Environment variable validation at resolution time
+**Validation:** Input sanitization at session name generation; boolean parsing accepts true/yes/1 and false/no/0
 
-**Authentication:**
-- N/A - No authentication required
+**Security:** No authentication; relies on OS-level permissions for tmux/zellij sockets
 
 ---
 

@@ -1,8 +1,8 @@
-use serde::Deserialize;
+use std::io;
 use std::path::PathBuf;
 
 /// Configuration for codemux, loaded from `~/.config/codemux/config.toml` (or platform equivalent).
-#[derive(Debug, Deserialize, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq)]
 pub struct Config {
     /// Preferred multiplexer: "tmux" or "zellij"
     pub multiplexer: Option<String>,
@@ -10,9 +10,53 @@ pub struct Config {
     pub auto_attach: Option<bool>,
 }
 
+/// Default configuration content as a TOML string with comments.
+pub(crate) const DEFAULT_CONFIG_CONTENT: &str = r#"# CodeMux configuration file
+# Location: ~/.config/codemux/config.toml
+
+# Preferred multiplexer: "tmux" or "zellij"
+# If not set, codemux will auto-detect from PATH (prefers tmux if both available)
+multiplexer = "tmux"
+
+# Whether to auto-attach to existing sessions
+# true = attach to existing session with same name if it exists
+# false = always create a new session with unique name
+auto_attach = true
+"#;
+
+/// Result type for config initialization.
+#[derive(Debug)]
+pub enum ConfigInitResult {
+    /// Config was newly created at this path.
+    Created(PathBuf),
+    /// Config already existed at this path.
+    AlreadyExists(PathBuf),
+}
+
+/// Creates a default config file at the platform-specific config directory.
+/// Returns the path where the config is located and whether it was created or already existed.
+/// Returns an error only if directory creation or file writing fails.
+pub fn create_default_config() -> Result<ConfigInitResult, io::Error> {
+    let config_path = get_config_path();
+
+    // Check if config already exists
+    if config_path.exists() {
+        return Ok(ConfigInitResult::AlreadyExists(config_path));
+    }
+
+    // Create parent directory if it doesn't exist
+    if let Some(parent) = config_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    // Write default config content
+    std::fs::write(&config_path, DEFAULT_CONFIG_CONTENT)?;
+
+    Ok(ConfigInitResult::Created(config_path))
+}
+
 /// Loads the config from the platform-specific config directory.
 /// Returns default Config if file is missing or unreadable.
-#[allow(dead_code)]
 pub fn load_config() -> Config {
     let config_path = get_config_path();
     match std::fs::read_to_string(&config_path) {
@@ -21,9 +65,30 @@ pub fn load_config() -> Config {
     }
 }
 
+/// Gets the platform-specific config directory.
+fn platform_config_dir() -> Option<PathBuf> {
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(appdata) = std::env::var("APPDATA") {
+            return Some(PathBuf::from(appdata));
+        }
+    }
+
+    #[cfg(unix)]
+    {
+        if let Ok(home) = std::env::var("HOME") {
+            let mut path = PathBuf::from(home);
+            path.push(".config");
+            return Some(path);
+        }
+    }
+
+    None
+}
+
 /// Gets the platform-specific config file path.
 fn get_config_path() -> PathBuf {
-    // Check $XDG_CONFIG_HOME first, then fall back to dirs::config_dir()
+    // Check $XDG_CONFIG_HOME first, then fall back to platform-specific config dir
     if let Ok(xdg_config) = std::env::var("XDG_CONFIG_HOME") {
         let mut path = PathBuf::from(xdg_config);
         path.push("codemux");
@@ -31,8 +96,8 @@ fn get_config_path() -> PathBuf {
         return path;
     }
 
-    // Use dirs crate for cross-platform config dir
-    if let Some(config_dir) = dirs::config_dir() {
+    // Use platform-specific config dir
+    if let Some(config_dir) = platform_config_dir() {
         let mut path = config_dir;
         path.push("codemux");
         path.push("config.toml");
@@ -43,80 +108,61 @@ fn get_config_path() -> PathBuf {
     PathBuf::from("config.toml")
 }
 
-/// Parses a TOML config string into a Config struct.
+/// Parses a minimal TOML-like config string for our specific format.
+///
+/// NOTE: This is a simplified, lenient parser that only supports basic key-value pairs.
+/// It intentionally deviates from strict TOML to be more user-friendly for simple configs.
+///
+/// It does NOT support:
+///   - Arrays, tables, or inline tables
+///   - Escaped characters in strings
+///   - Multi-line strings
+///   - Dotted keys
+///
+/// Supported formats:
+///   multiplexer = "value"   (or 'value', or bare words like `tmux`)
+///   auto_attach = true/false/yes/no/1/0
+///
+/// Lenient parsing behavior:
+///   - Unquoted values like `multiplexer = tmux` are accepted and treated as strings
+///   - Values are trimmed and quotes are stripped automatically
+///   - This differs from strict TOML where bare words would be invalid
+///   - If you need strict TOML compliance, quote all string values
+///
 /// Returns defaults if parsing fails.
-#[allow(dead_code)]
 pub fn parse_config_str(contents: &str) -> Config {
-    toml::from_str(contents).unwrap_or_default()
-}
+    let mut config = Config::default();
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+    for line in contents.lines() {
+        // Remove trailing comments and trim
+        let line = line.split('#').next().unwrap_or("").trim();
 
-    #[test]
-    fn test_parse_valid_toml() {
-        let toml = r#"
-multiplexer = "tmux"
-auto_attach = true
-"#;
-        let config = parse_config_str(toml);
-        assert_eq!(config.multiplexer, Some("tmux".to_string()));
-        assert_eq!(config.auto_attach, Some(true));
+        if line.is_empty() {
+            continue;
+        }
+
+        if let Some(eq_pos) = line.find('=') {
+            let key = line[..eq_pos].trim();
+            let value = line[eq_pos + 1..].trim();
+
+            match key {
+                "multiplexer" => {
+                    let cleaned = value.trim_matches('"').trim_matches('\'');
+                    if !cleaned.is_empty() {
+                        config.multiplexer = Some(cleaned.to_string());
+                    }
+                }
+                "auto_attach" => {
+                    match value {
+                        "true" | "yes" | "1" => config.auto_attach = Some(true),
+                        "false" | "no" | "0" => config.auto_attach = Some(false),
+                        _ => {} // Ignore invalid values
+                    }
+                }
+                _ => {}
+            }
+        }
     }
 
-    #[test]
-    fn test_parse_zellij_config() {
-        let toml = r#"
-multiplexer = "zellij"
-auto_attach = false
-"#;
-        let config = parse_config_str(toml);
-        assert_eq!(config.multiplexer, Some("zellij".to_string()));
-        assert_eq!(config.auto_attach, Some(false));
-    }
-
-    #[test]
-    fn test_parse_empty_string() {
-        let config = parse_config_str("");
-        assert_eq!(config.multiplexer, None);
-        assert_eq!(config.auto_attach, None);
-    }
-
-    #[test]
-    fn test_parse_invalid_toml() {
-        // Invalid TOML should return defaults, not panic
-        let config = parse_config_str("not valid toml [ broken");
-        assert_eq!(config.multiplexer, None);
-        assert_eq!(config.auto_attach, None);
-    }
-
-    #[test]
-    fn test_parse_partial_config() {
-        // Only multiplexer specified, auto_attach omitted
-        let toml = r#"multiplexer = "tmux""#;
-        let config = parse_config_str(toml);
-        assert_eq!(config.multiplexer, Some("tmux".to_string()));
-        assert_eq!(config.auto_attach, None);
-    }
-
-    #[test]
-    fn test_default_config() {
-        let config = Config::default();
-        assert_eq!(config.multiplexer, None);
-        assert_eq!(config.auto_attach, None);
-    }
-
-    #[test]
-    fn test_parse_config_with_extra_fields() {
-        // Extra fields should be ignored
-        let toml = r#"
-multiplexer = "tmux"
-auto_attach = true
-unknown_field = "ignored"
-"#;
-        let config = parse_config_str(toml);
-        assert_eq!(config.multiplexer, Some("tmux".to_string()));
-        assert_eq!(config.auto_attach, Some(true));
-    }
+    config
 }
