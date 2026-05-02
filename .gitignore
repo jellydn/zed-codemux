@@ -15,5 +15,3 @@ Cargo.lock
 
 # Test artifacts
 *.log
-
-extension/target/
