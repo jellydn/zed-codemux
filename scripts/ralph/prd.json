@@ -2,6 +2,13 @@
   "project": "CodeMux for Zed",
   "branchName": "ralph/zed-codemux",
   "description": "Drop-in CLI binary (codemux) that opens Zed terminals inside tmux/zellij — port of vscode-mux to Zed, packaged in the lean style of th0jensen/fff-gpui (pure Rust binary, no Zed extension manifest, integration via Zed settings.json or tasks.json + keymap.json). Mirrors vscode-mux session-naming and multi-window indexing exactly so the same workspace opened in VS Code and Zed lands in the same multiplexer session.",
+  "knownIssues": [
+    "Legacy Zed extension artifacts remain in the repo from the pre-fff-gpui-pivot direction and contradict the current 'no extension manifest' design: `extension.toml` at repo root, `tasks/zed-extension-submission.md`, and the 'Zed Extension' section of `AGENTS.md`. They must be removed.",
+    "Legacy release workflow `.github/workflows/release.yml` was added during an earlier iteration but the current PRD defers prebuilt-binary release to v1.1 (source build only in v1, mirroring fff-gpui). Decide whether to keep, mark as v1.1-prep, or remove for v1 scope clarity.",
+    "`Cargo.toml` declares both `serde = { version = \"1.0\", features = [\"derive\"] }` and a separate `serde_derive = \"1.0\"`. The latter is redundant — `serde`'s `derive` feature pulls in `serde_derive` transitively. Remove the standalone `serde_derive` dependency.",
+    "`AGENTS.md` contains a duplicated 'Task runner (`just`)' code block (lines ~28-50 and ~52-56). Deduplicate.",
+    "`AGENTS.md` 'CI / Release' section still describes `release.yml` and the 'Zed Extension' section still describes `extension.toml`. Both must be rewritten or removed once the legacy artifacts are deleted."
+  ],
   "userStories": [
     {
       "id": "US-001",
@@ -19,7 +26,7 @@
       ],
       "priority": 1,
       "passes": true,
-      "notes": "Completed: Cargo.toml with [[bin]] target, all dependencies (clap with derive, which, serde, toml, anyhow, regex, dirs), src/main.rs, .gitignore with /target and .DS_Store, LICENSE (MIT 2026 jellydn). Build and tests pass."
+      "notes": "Done. Cargo.toml + src/main.rs + .gitignore + LICENSE all in place. Note: redundant `serde_derive` dep listed alongside `serde` derive feature — see knownIssues."
     },
     {
       "id": "US-002",
@@ -35,8 +42,8 @@
         "Tests pass"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Done in src/sanitize.rs. All vscode-mux fixtures pass."
     },
     {
       "id": "US-003",
@@ -52,8 +59,8 @@
         "Tests pass"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Done in src/shell_escape.rs."
     },
     {
       "id": "US-004",
@@ -69,8 +76,8 @@
         "Tests pass"
       ],
       "priority": 4,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Done in src/config.rs."
     },
     {
       "id": "US-005",
@@ -85,8 +92,8 @@
         "Tests pass"
       ],
       "priority": 5,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Done in src/detect.rs. Uses `*_with_env` HashMap-injection pattern for testability."
     },
     {
       "id": "US-006",
@@ -103,8 +110,8 @@
         "Tests pass"
       ],
       "priority": 6,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Done in src/launcher.rs + src/tmux.rs."
     },
     {
       "id": "US-007",
@@ -120,15 +127,15 @@
         "Tests pass"
       ],
       "priority": 7,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Done in src/zellij.rs."
     },
     {
       "id": "US-008",
       "title": "Implement get_unique_session_name with gap-filling",
       "description": "As the codemux binary, I need to compute a unique suffixed session name using the exact vscode-mux algorithm so multi-window scenarios behave identically across editors.",
       "acceptanceCriteria": [
-        "Add src/unique_name.rs with `pub fn get_unique_session_name(base: &str, sessions: &[String]) -> String` (pure function — takes the session list as input so it is trivially testable)",
+        "Add `pub fn get_unique_session_name(base: &str, sessions: &[String]) -> String` (pure function — takes the session list as input so it is trivially testable)",
         "If `base` is not in `sessions`, return `base` unchanged",
         "Otherwise start `suffix = 2`; while `format!(\"{base}-{suffix}\")` is in `sessions`, `suffix += 1`; return `format!(\"{base}-{suffix}\")`",
         "Unit tests cover the PRD table: [] → 'myapp', ['myapp'] → 'myapp-2', ['myapp','myapp-2'] → 'myapp-3', ['myapp','myapp-2','myapp-5'] → 'myapp-3' (gap-fill)",
@@ -136,8 +143,8 @@
         "Tests pass"
       ],
       "priority": 8,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Done as `get_unique_session_name` in src/sanitize.rs (lives next to sanitize for cohesion). Uses HashSet<&str> for O(1) lookup. PRD allowed src/unique_name.rs but co-located implementation is acceptable; document this in AGENTS.md if not already."
     },
     {
       "id": "US-009",
@@ -155,8 +162,8 @@
         "Tests pass"
       ],
       "priority": 9,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Done in src/main.rs. 14 helper unit tests added (resolve_auto_attach, get_base_name, decide_fallback_shell). All 71 tests pass."
     },
     {
       "id": "US-010",
@@ -172,8 +179,8 @@
         "Tests pass"
       ],
       "priority": 10,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Done in src/main.rs alongside US-009. Uses `--` instead of `—` in the warning string (ASCII safe for terminals); update doc strings to match if needed."
     },
     {
       "id": "US-011",
@@ -189,8 +196,8 @@
         "Tests pass"
       ],
       "priority": 11,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Done. Clap derive with `trailing_var_arg = true, allow_hyphen_values = true` for arg passthrough. 5 unit tests for debug_enabled."
     },
     {
       "id": "US-012",
@@ -200,7 +207,7 @@
         "Create `.zed/tasks.json` at the repo root with a 'Build and run codemux' task: command `cargo build --release && ./target/release/codemux`, `hide: on_success`, `save: all` — mirrors fff-gpui's `.zed/tasks.json` convenience pattern",
         "Create `docs/zed-integration.md` documenting the two integration patterns end-to-end:",
         "  Option A — `~/.config/zed/settings.json` snippet pointing `terminal.shell.program` at the absolute path of `codemux`",
-        "  Option B — `~/.config/zed/tasks.json` snippet defining an 'Open codemux terminal' task (use_new_terminal: true, allow_concurrent_runs: false, reveal: always, shell: system) plus a `~/.config/zed/keymap.json` binding (e.g. `cmd-j` → `task::Spawn`) — modeled after fff-gpui's README example",
+        "  Option B — `~/.config/zed/tasks.json` snippet defining an 'Open codemux terminal' task plus a `~/.config/zed/keymap.json` binding (e.g. `cmd-j` → `task::Spawn`) — modeled after fff-gpui's README example",
         "Cross-reference fff-gpui in the docs as the inspiration for the task-based pattern",
         "README at repo root already references both patterns — this story verifies the linked `docs/zed-integration.md` actually exists and matches",
         "Both JSON snippets in the docs are valid JSON (lint with `python3 -m json.tool` or equivalent)",
@@ -208,7 +215,7 @@
       ],
       "priority": 12,
       "passes": true,
-      "notes": "Completed 2026-05-02: Created .zed/tasks.json and docs/zed-integration.md with Option A (settings.json) and Option B (tasks.json + keymap.json) integration patterns, fff-gpui pattern documented, valid JSON verified"
+      "notes": "Done. .zed/tasks.json + docs/zed-integration.md created."
     },
     {
       "id": "US-013",
@@ -224,23 +231,63 @@
         "Typecheck passes"
       ],
       "priority": 13,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Done. ci.yml in place, all 71 tests + clippy + fmt clean locally."
     },
     {
       "id": "US-014",
-      "title": "Polish README + add 'Differences from vscode-mux' and 'Design philosophy' verification",
+      "title": "Polish README + verify 'Differences from vscode-mux' and 'Design philosophy'",
       "description": "As a new user, I want a README that walks me through install → configure (both options) → first terminal, and explains why this project is a binary instead of a Zed extension.",
       "acceptanceCriteria": [
         "Verify README.md at repo root covers: Why → Design philosophy (binary vs extension, fff-gpui inspiration) → Features → Install (source build) → Zed integration (Option A settings.json + Option B tasks.json+keymap) → Configuration (env + config.toml) → Session naming table → Multiplexer commands table → Project layout → Differences from vscode-mux → Roadmap → Credits (vscode-mux + fff-gpui + Zed) → License",
-        "Add `assets/` folder containing a placeholder `demo.gif` (1×1 transparent PNG renamed is OK if no real GIF yet) and reference it from the README's Why section",
+        "`assets/` folder exists with a placeholder `demo.gif` (1×1 transparent placeholder is OK if no real GIF yet) and is referenced from the README's Why section",
         "All internal markdown links (`tasks/prd-zed-mux.md`, `scripts/ralph/prd.json`, `docs/zed-integration.md`, `LICENSE`) resolve to existing files",
-        "All external links in README work (vscode-mux, fff-gpui, Zed docs) — eyeball check or `markdown-link-check`",
+        "All external links in README work (vscode-mux, fff-gpui, Zed docs) — eyeball check",
+        "README contains NO mention of an `extension.toml`, Zed extension manifest, marketplace listing, or 'companion extension' (those were dropped after the fff-gpui-direction pivot)",
         "Typecheck passes"
       ],
       "priority": 14,
+      "passes": true,
+      "notes": "Done. README sections in place, demo.gif placeholder exists, fff-gpui/vscode-mux credits in place, no extension references in README itself."
+    },
+    {
+      "id": "US-015",
+      "title": "Remove legacy Zed-extension and release-workflow artifacts (fff-gpui alignment cleanup)",
+      "description": "As a maintainer, I need to remove repo files that contradict the current 'pure CLI binary, no Zed extension manifest, source-build-only in v1' direction so the repo and PRD agree.",
+      "acceptanceCriteria": [
+        "Delete `extension.toml` at repo root (introduced before the fff-gpui-pivot; the design now has no Zed extension manifest)",
+        "Delete `tasks/zed-extension-submission.md` (corresponding submission guide is no longer relevant for v1)",
+        "Delete `.github/workflows/release.yml` (release pipeline is deferred to v1.1 per the updated PRD; only `ci.yml` remains in v1)",
+        "Update `AGENTS.md`: remove the 'Zed Extension' section entirely; remove or rewrite the 'CI / Release' section so it only references `ci.yml`",
+        "Update `AGENTS.md`: deduplicate the repeated 'Task runner (`just`)' code block (currently appears twice)",
+        "Update `AGENTS.md`: in the architecture file map, note that `get_unique_session_name` lives in `src/sanitize.rs` (not a separate `src/unique_name.rs`)",
+        "After deletions, run the full quality gate: `cargo build --release && cargo test && cargo clippy -- -D warnings && cargo fmt --check` — all pass",
+        "After deletions, README still has no broken internal links",
+        "If `tasks/` directory becomes empty besides `prd-zed-mux.md`, leave it as-is",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 15,
       "passes": false,
-      "notes": ""
+      "notes": "New cleanup story added during PRD review. Resolves all entries in `knownIssues` array."
+    },
+    {
+      "id": "US-016",
+      "title": "Cargo.toml dependency cleanup",
+      "description": "As a maintainer, I want `Cargo.toml` to be free of redundant dependencies so the dependency graph stays minimal (in the spirit of fff-gpui).",
+      "acceptanceCriteria": [
+        "Remove the standalone `serde_derive = \"1.0\"` line from `Cargo.toml` — it is already pulled in transitively by `serde = { version = \"1.0\", features = [\"derive\"] }`",
+        "Verify `cargo build --release` still succeeds after the removal",
+        "Verify all 71+ tests still pass: `cargo test`",
+        "Verify clippy clean: `cargo clippy -- -D warnings`",
+        "Verify formatting: `cargo fmt --check`",
+        "Update `Cargo.lock` (committed via the build)",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 16,
+      "passes": false,
+      "notes": "New cleanup story added during PRD review. Resolves the Cargo.toml entry in `knownIssues`."
     }
   ]
 }

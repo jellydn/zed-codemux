@@ -4,12 +4,14 @@
 
 **CodeMux for Zed** is a port of the [vscode-mux](https://github.com/jellydn/vscode-mux) extension to the [Zed editor](https://zed.dev). It makes opening Zed's integrated terminal automatically attach to (or create) a tmux or zellij session named after the current workspace, so users can jump between Zed and VS Code (or any other editor) and land in the **same multiplexer session** for the same project.
 
-Because Zed's extension API does **not** expose a "terminal profile" hook like VS Code does, CodeMux for Zed is delivered as **two pieces** that ship together:
+Because Zed's extension API does **not** expose a "terminal profile" hook like VS Code does — and following the lean packaging approach pioneered by [`th0jensen/fff-gpui`](https://github.com/th0jensen/fff-gpui) — CodeMux for Zed is delivered as a **single native CLI binary**, with **no Zed extension manifest, no marketplace listing, no WASM**.
 
-1. **`codemux` CLI binary** — written in Rust, statically linked, mirrors `vscode-mux`'s session-naming + multiplexer logic 1:1.
-2. **A companion Zed extension** — published in the [`zed-industries/extensions`](https://github.com/zed-industries/extensions) registry. The extension makes the project discoverable inside Zed and (per Zed extension guidelines) downloads/locates the `codemux` binary on first use; users then point Zed's `terminal.shell` at it.
+Users wire it into Zed via existing user configuration files:
 
-Same name, same behavior, same session names → seamless switching between VS Code and Zed for the same workspace.
+- **Option A** — set `terminal.shell.program` to `codemux` in `~/.config/zed/settings.json`.
+- **Option B** — define an "Open codemux terminal" task in `~/.config/zed/tasks.json` and bind it to a hotkey in `~/.config/zed/keymap.json` (the same pattern fff-gpui uses).
+
+Same name, same behavior, same session names as `vscode-mux` → seamless switching between VS Code and Zed for the same workspace.
 
 ## 2. Goals
 
