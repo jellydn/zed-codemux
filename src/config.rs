@@ -22,41 +22,14 @@ pub fn load_config() -> Config {
 
 /// Gets the platform-specific config directory.
 fn platform_config_dir() -> Option<PathBuf> {
-    // Check $XDG_CONFIG_HOME first (Linux/macOS standard)
-    if let Ok(xdg_config) = std::env::var("XDG_CONFIG_HOME") {
-        return Some(PathBuf::from(xdg_config));
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        // macOS: ~/.config (following XDG standard, matching Linux behavior)
-        if let Ok(home) = std::env::var("HOME") {
-            let mut path = PathBuf::from(home);
-            path.push(".config");
-            return Some(path);
-        }
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        // Linux: ~/.config
-        if let Ok(home) = std::env::var("HOME") {
-            let mut path = PathBuf::from(home);
-            path.push(".config");
-            return Some(path);
-        }
-    }
-
     #[cfg(target_os = "windows")]
     {
-        // Windows: %APPDATA%
         if let Ok(appdata) = std::env::var("APPDATA") {
             return Some(PathBuf::from(appdata));
         }
     }
 
-    // Fallback for other Unix systems
-    #[cfg(all(unix, not(target_os = "macos")))]
+    #[cfg(unix)]
     {
         if let Ok(home) = std::env::var("HOME") {
             let mut path = PathBuf::from(home);
@@ -98,43 +71,42 @@ fn get_config_path() -> PathBuf {
 ///   - Escaped characters in strings
 ///   - Multi-line strings
 ///   - Dotted keys
-///   - Values containing '#'
 ///
 /// Supported formats:
 ///   multiplexer = "value"   (or 'value')
 ///   auto_attach = true/false/yes/no/1/0
 ///
 /// Returns defaults if parsing fails.
-#[allow(dead_code)]
 pub fn parse_config_str(contents: &str) -> Config {
     let mut config = Config::default();
 
     for line in contents.lines() {
-        let line = line.trim();
+        // Remove trailing comments and trim
+        let line = line.split('#').next().unwrap_or("").trim();
 
-        // Skip empty lines and comments
-        if line.is_empty() || line.starts_with('#') {
+        if line.is_empty() {
             continue;
         }
 
-        // Parse key = "value" or key = true/false
         if let Some(eq_pos) = line.find('=') {
             let key = line[..eq_pos].trim();
             let value = line[eq_pos + 1..].trim();
 
             match key {
                 "multiplexer" => {
-                    // Extract string value (handles "value" or 'value')
                     let cleaned = value.trim_matches('"').trim_matches('\'');
                     if !cleaned.is_empty() {
                         config.multiplexer = Some(cleaned.to_string());
                     }
                 }
                 "auto_attach" => {
-                    // Parse boolean
-                    config.auto_attach = Some(value == "true" || value == "yes" || value == "1");
+                    match value {
+                        "true" | "yes" | "1" => config.auto_attach = Some(true),
+                        "false" | "no" | "0" => config.auto_attach = Some(false),
+                        _ => {} // Ignore invalid values
+                    }
                 }
-                _ => {} // Unknown keys are ignored
+                _ => {}
             }
         }
     }
@@ -266,5 +238,29 @@ auto_attach = true
             Some(false)
         );
         assert_eq!(parse_config_str("auto_attach = 0").auto_attach, Some(false));
+    }
+
+    #[test]
+    fn test_parse_trailing_comments() {
+        // Trailing comments should be stripped
+        let toml = r#"multiplexer = "tmux" # this is a comment"#;
+        let config = parse_config_str(toml);
+        assert_eq!(config.multiplexer, Some("tmux".to_string()));
+
+        let toml2 = r#"auto_attach = true # enable auto attach"#;
+        let config2 = parse_config_str(toml2);
+        assert_eq!(config2.auto_attach, Some(true));
+    }
+
+    #[test]
+    fn test_parse_invalid_boolean_ignored() {
+        // Invalid boolean values should be ignored (not treated as false)
+        let toml = r#"
+multiplexer = "tmux"
+auto_attach = invalid_value
+"#;
+        let config = parse_config_str(toml);
+        assert_eq!(config.multiplexer, Some("tmux".to_string()));
+        assert_eq!(config.auto_attach, None); // Not Some(false), but None (ignored)
     }
 }

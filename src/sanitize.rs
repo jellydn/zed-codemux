@@ -35,8 +35,12 @@ pub fn sanitize_session_name(name: &str) -> String {
     result = collapsed;
 
     // Step 3 & 4: Strip leading and trailing '-'
-    while result.first() == Some(&'-') {
-        result.remove(0);
+    let start = result
+        .iter()
+        .position(|&c| c != '-')
+        .unwrap_or(result.len());
+    if start > 0 {
+        result.drain(0..start);
     }
     while result.last() == Some(&'-') {
         result.pop();

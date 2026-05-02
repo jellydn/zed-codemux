@@ -11,7 +11,7 @@
 | Homebrew tap formula | 📝 Deferred | Documented as v1.1 in README and release workflow |
 | Direct release download | ✅ Ready | GitHub release workflow will create downloadable artifacts |
 | `codemux --version` prints version | ✅ PASS | `codemux 0.1.0` verified |
-| `codemux --help` prints usage | ✅ PASS | clap generates help output |
+| `codemux --help` prints usage | ✅ PASS | manual parser generates help output |
 
 ## US-002: Configure Zed to use `codemux` as terminal shell
 
