@@ -261,6 +261,8 @@ When `auto_attach = false`, CodeMux finds the **first available** suffixed name 
 | Always-new | `tmux new-session -s <name> -c <cwd>` | `zellij -s <name>` |
 | List sessions | `tmux list-sessions -F '#{session_name}'` | `zellij list-sessions -n` |
 
+> **Note on zellij CWD behavior:** When `auto_attach = false` (always-new mode), zellij starts in the current working directory since it lacks a `-c` option for explicit CWD. This differs from tmux which always respects the `-c` flag.
+
 ---
 
 ## Requirements

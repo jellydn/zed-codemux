@@ -140,7 +140,7 @@ pub(crate) fn decide_fallback_shell(env: &HashMap<String, String>) -> String {
 
 fn main() -> io::Result<()> {
     // Parse CLI arguments (handles --version and --help)
-    let _args = parse_args();
+    let extra_args = parse_args();
 
     // Get current working directory
     let cwd = std::env::current_dir()?;
@@ -171,11 +171,25 @@ fn main() -> io::Result<()> {
     match multiplexer {
         Some(Multiplexer::Tmux) => {
             let launcher = TmuxLauncher::new();
-            run_with_launcher(&launcher, &sanitized_name, &cwd, auto_attach, debug)?;
+            run_with_launcher(
+                &launcher,
+                &sanitized_name,
+                &cwd,
+                auto_attach,
+                debug,
+                &extra_args,
+            )?;
         }
         Some(Multiplexer::Zellij) => {
             let launcher = ZellijLauncher::new();
-            run_with_launcher(&launcher, &sanitized_name, &cwd, auto_attach, debug)?;
+            run_with_launcher(
+                &launcher,
+                &sanitized_name,
+                &cwd,
+                auto_attach,
+                debug,
+                &extra_args,
+            )?;
         }
         None => {
             // No multiplexer found - fallback to shell
@@ -186,7 +200,7 @@ fn main() -> io::Result<()> {
                     shell
                 );
             }
-            run_fallback_shell(&env_map)?;
+            run_fallback_shell(&env_map, &extra_args)?;
         }
     }
 
@@ -202,6 +216,7 @@ fn run_with_launcher(
     cwd: &std::path::Path,
     auto_attach: bool,
     debug: bool,
+    args: &[String],
 ) -> io::Result<()> {
     // Get list of existing sessions
     let sessions = launcher.list_sessions()?;
@@ -236,18 +251,27 @@ fn run_with_launcher(
     }
 
     // Execute the command
-    exec_command(&command)
+    exec_command(&command, args)
 }
 
 /// Executes a command by exec'ing into the user's shell
 #[cfg(unix)]
-fn exec_command(command: &str) -> io::Result<()> {
+fn exec_command(command: &str, args: &[String]) -> io::Result<()> {
     use std::os::unix::process::CommandExt;
     use std::process::Command;
 
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string());
 
-    let err = Command::new(&shell).args(["-l", "-c", command]).exec();
+    // Build the full command: multiplexer command + any extra args
+    let full_command = if args.is_empty() {
+        command.to_string()
+    } else {
+        format!("{} {}", command, args.join(" "))
+    };
+
+    let err = Command::new(&shell)
+        .args(["-l", "-c", &full_command])
+        .exec();
 
     // If exec fails, return an error (shell path is escaped for security)
     Err(io::Error::new(
@@ -258,14 +282,21 @@ fn exec_command(command: &str) -> io::Result<()> {
 
 /// Executes a command by spawning and waiting (Windows version)
 #[cfg(windows)]
-fn exec_command(command: &str) -> io::Result<()> {
+fn exec_command(command: &str, args: &[String]) -> io::Result<()> {
     use std::process::Command;
 
     let shell = std::env::var("SHELL")
         .or_else(|_| std::env::var("COMSPEC"))
         .unwrap_or_else(|_| "cmd.exe".to_string());
 
-    let status = Command::new(&shell).args(["/C", command]).status()?;
+    // Build the full command: multiplexer command + any extra args
+    let full_command = if args.is_empty() {
+        command.to_string()
+    } else {
+        format!("{} {}", command, args.join(" "))
+    };
+
+    let status = Command::new(&shell).args(["/C", &full_command]).status()?;
 
     // Propagate exit code
     std::process::exit(status.code().unwrap_or(1));
@@ -273,16 +304,23 @@ fn exec_command(command: &str) -> io::Result<()> {
 
 /// Fallback shell for non-Unix, non-Windows systems
 #[cfg(not(any(unix, windows)))]
-fn exec_command(command: &str) -> io::Result<()> {
+fn exec_command(command: &str, args: &[String]) -> io::Result<()> {
     use std::process::Command;
 
-    let status = Command::new("sh").args(["-c", command]).status()?;
+    // Build the full command: command + any extra args
+    let full_command = if args.is_empty() {
+        command.to_string()
+    } else {
+        format!("{} {}", command, args.join(" "))
+    };
+
+    let status = Command::new("sh").args(["-c", &full_command]).status()?;
 
     std::process::exit(status.code().unwrap_or(1));
 }
 
 /// Runs the fallback shell when no multiplexer is installed
-fn run_fallback_shell(env: &HashMap<String, String>) -> io::Result<()> {
+fn run_fallback_shell(env: &HashMap<String, String>, args: &[String]) -> io::Result<()> {
     let shell = decide_fallback_shell(env);
 
     eprintln!("codemux: tmux/zellij not found on PATH -- falling back to {}. Install tmux or zellij to enable multiplexer mode.", shell);
@@ -292,7 +330,13 @@ fn run_fallback_shell(env: &HashMap<String, String>) -> io::Result<()> {
         use std::os::unix::process::CommandExt;
         use std::process::Command;
 
-        let err = Command::new(&shell).exec();
+        let err = if args.is_empty() {
+            Command::new(&shell).exec()
+        } else {
+            Command::new(&shell)
+                .args(["-l", "-c", &args.join(" ")])
+                .exec()
+        };
         Err(io::Error::new(
             io::ErrorKind::Other,
             format!("Failed to exec shell {}: {}", shell_escape(&shell), err),
@@ -303,7 +347,13 @@ fn run_fallback_shell(env: &HashMap<String, String>) -> io::Result<()> {
     {
         use std::process::Command;
 
-        let status = Command::new(&shell).status()?;
+        let status = if args.is_empty() {
+            Command::new(&shell).status()?
+        } else {
+            Command::new(&shell)
+                .args(["/C", &args.join(" ")])
+                .status()?
+        };
         std::process::exit(status.code().unwrap_or(1));
     }
 
@@ -311,7 +361,13 @@ fn run_fallback_shell(env: &HashMap<String, String>) -> io::Result<()> {
     {
         use std::process::Command;
 
-        let status = Command::new(&shell).status()?;
+        let status = if args.is_empty() {
+            Command::new(&shell).status()?
+        } else {
+            Command::new(&shell)
+                .args(["-c", &args.join(" ")])
+                .status()?
+        };
         std::process::exit(status.code().unwrap_or(1));
     }
 }
