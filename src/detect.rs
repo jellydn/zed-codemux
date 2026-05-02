@@ -48,6 +48,12 @@ fn find_in_path(binary: &str) -> bool {
 
 /// Core detection logic using a provided environment lookup.
 /// The env_lookup closure takes a var name and returns its value if present.
+///
+/// NOTE: The PATH-based fallback (`find_in_path`) is not testable via the
+/// env_lookup injection since it reads PATH directly. This is intentional:
+/// all existing tests provide env/config values, so they return before PATH
+/// probing. Making PATH testable would require additional abstraction overhead
+/// for little practical benefit in current test scenarios.
 fn detect_with_env_lookup(
     config: &Config,
     env_lookup: impl Fn(&str) -> Option<String>,
