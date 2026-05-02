@@ -2,7 +2,7 @@
 name = "codemux"
 version = "0.1.0"
 edition = "2021"
-authors = ["jellydn"]
+authors = ["jellydn <dung@productsway.com>"]
 description = "Drop-in CLI binary that opens Zed terminals inside tmux or zellij — port of vscode-mux to Zed"
 license = "MIT"
 repository = "https://github.com/jellydn/zed-codemux"

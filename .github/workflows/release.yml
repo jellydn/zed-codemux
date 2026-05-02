@@ -1,0 +1,143 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build and Release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            binary_name: codemux
+            asset_name: codemux-linux-x64
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            binary_name: codemux
+            asset_name: codemux-macos-x64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            binary_name: codemux
+            asset_name: codemux-macos-arm64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            binary_name: codemux.exe
+            asset_name: codemux-windows-x64.exe
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Build release binary
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Strip binary (Unix)
+        if: matrix.os != 'windows-latest'
+        run: strip target/${{ matrix.target }}/release/${{ matrix.binary_name }}
+
+      - name: Create release archive
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp target/${{ matrix.target }}/release/${{ matrix.binary_name }} dist/${{ matrix.asset_name }}
+          cd dist
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            7z a ${{ matrix.asset_name }}.zip ${{ matrix.asset_name }}
+          else
+            tar czf ${{ matrix.asset_name }}.tar.gz ${{ matrix.asset_name }}
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset_name }}
+          path: dist/${{ matrix.asset_name }}${{ matrix.os == 'windows-latest' && '.zip' || '.tar.gz' }}
+
+  create-release:
+    name: Create Release
+    needs: build-and-release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/*
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref, '-alpha') || contains(github.ref, '-beta') || contains(github.ref, '-rc') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update release notes with install instructions
+        run: |
+          cat >> release_notes.md << 'EOF'
+
+          ## Installation
+
+          ### Direct Download
+          Download the appropriate binary for your platform and place it in your `$PATH`:
+
+          ```bash
+          # macOS (Apple Silicon)
+          curl -L -o codemux https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/codemux-macos-arm64
+          chmod +x codemux
+          sudo mv codemux /usr/local/bin/
+
+          # macOS (Intel)
+          curl -L -o codemux https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/codemux-macos-x64
+          chmod +x codemux
+          sudo mv codemux /usr/local/bin/
+
+          # Linux (x64)
+          curl -L -o codemux https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/codemux-linux-x64
+          chmod +x codemux
+          sudo mv codemux /usr/local/bin/
+          ```
+
+          ### Build from source
+          ```bash
+          cargo install --git https://github.com/${{ github.repository }}
+          ```
+
+          ### Homebrew (coming in v1.1)
+          ```bash
+          brew tap jellydn/codemux
+          brew install codemux
+          ```
+
+          ## Verify Installation
+          ```bash
+          codemux --version
+          codemux --help
+          ```
+          EOF

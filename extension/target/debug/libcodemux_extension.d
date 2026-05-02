@@ -1,0 +1,1 @@
+/Users/huynhdung/conductor/workspaces/2026-05-01-zed-codemux/brisbane/extension/target/debug/libcodemux_extension.dylib: /Users/huynhdung/conductor/workspaces/2026-05-01-zed-codemux/brisbane/extension/src/lib.rs
