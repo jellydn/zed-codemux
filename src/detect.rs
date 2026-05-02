@@ -267,8 +267,9 @@ mod tests {
         // Build PATH string
         let path_env = temp_dir.to_string_lossy().to_string();
 
-        // Should find the binary
-        assert!(find_in_path_with_env("tmux", &path_env, ':'));
+        // Should find the binary (use platform-appropriate separator)
+        let path_sep = if cfg!(windows) { ';' } else { ':' };
+        assert!(find_in_path_with_env("tmux", &path_env, path_sep));
 
         // Cleanup
         std::fs::remove_file(&binary_path).unwrap();
@@ -321,15 +322,17 @@ mod tests {
             std::fs::set_permissions(&binary_path, perms).unwrap();
         }
 
-        // Build PATH with both directories (colon-separated)
+        // Build PATH with both directories (platform-appropriate separator)
+        let path_sep = if cfg!(windows) { ';' } else { ':' };
         let path_env = format!(
-            "{}:{}",
+            "{}{}{}",
             temp_dir1.to_string_lossy(),
+            path_sep,
             temp_dir2.to_string_lossy()
         );
 
         // Should find zellij in second directory
-        assert!(find_in_path_with_env("zellij", &path_env, ':'));
+        assert!(find_in_path_with_env("zellij", &path_env, path_sep));
 
         // Cleanup
         std::fs::remove_file(&binary_path).unwrap();
