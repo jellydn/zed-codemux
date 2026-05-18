@@ -1,6 +1,32 @@
 use crate::tmux::TmuxLauncher;
 use crate::MuxLauncher;
 
+/// RAII guard that restores an environment variable to its original value on drop.
+/// Ensures env vars are restored even when a test panics.
+struct EnvGuard {
+    key: String,
+    saved: Option<String>,
+}
+
+impl EnvGuard {
+    fn new(key: &str) -> Self {
+        let saved = std::env::var(key).ok();
+        Self {
+            key: key.to_string(),
+            saved,
+        }
+    }
+}
+
+impl Drop for EnvGuard {
+    fn drop(&mut self) {
+        match &self.saved {
+            Some(v) => std::env::set_var(&self.key, v),
+            None => std::env::remove_var(&self.key),
+        }
+    }
+}
+
 #[test]
 fn test_build_command_auto_attach_true() {
     let launcher = TmuxLauncher::new();
@@ -8,6 +34,52 @@ fn test_build_command_auto_attach_true() {
     assert_eq!(
         cmd,
         "tmux new-session -A -s 'myapp' -c '/home/user/projects/myapp'"
+    );
+}
+
+#[test]
+fn test_is_inside_session_false_when_tmux_unset() {
+    let _guard = EnvGuard::new("TMUX");
+    std::env::remove_var("TMUX");
+    let launcher = TmuxLauncher::new();
+    assert!(!launcher.is_inside_session());
+}
+
+#[test]
+fn test_is_inside_session_true_when_tmux_set() {
+    let _guard = EnvGuard::new("TMUX");
+    std::env::set_var("TMUX", "/tmp/tmux-501/default,1836,0");
+    let launcher = TmuxLauncher::new();
+    assert!(launcher.is_inside_session());
+}
+
+#[test]
+fn test_build_inside_command() {
+    let launcher = TmuxLauncher::new();
+    let cmd = launcher.build_inside_command("myapp", "/home/user/projects/myapp");
+    assert_eq!(
+        cmd,
+        "tmux new-window -n 'myapp' -c '/home/user/projects/myapp'"
+    );
+}
+
+#[test]
+fn test_build_inside_command_with_spaces() {
+    let launcher = TmuxLauncher::new();
+    let cmd = launcher.build_inside_command("my app", "/home/user/my projects");
+    assert_eq!(
+        cmd,
+        "tmux new-window -n 'my app' -c '/home/user/my projects'"
+    );
+}
+
+#[test]
+fn test_build_inside_command_with_quotes() {
+    let launcher = TmuxLauncher::new();
+    let cmd = launcher.build_inside_command("it's", "/home/user/john's files");
+    assert_eq!(
+        cmd,
+        "tmux new-window -n 'it'\"'\"'s' -c '/home/user/john'\"'\"'s files'"
     );
 }
 
