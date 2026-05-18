@@ -166,6 +166,7 @@ fn main() -> io::Result<()> {
     // Compute base session name from CWD basename
     let base_name = get_base_name(&cwd);
     let sanitized_name = sanitize_session_name(&base_name);
+    let full_sanitized_name = sanitize_session_name_full(&base_name);
 
     // Load config and detect multiplexer
     let config = load_config();
@@ -192,6 +193,7 @@ fn main() -> io::Result<()> {
             run_with_launcher(
                 &launcher,
                 &sanitized_name,
+                &full_sanitized_name,
                 &cwd,
                 auto_attach,
                 debug,
@@ -203,6 +205,7 @@ fn main() -> io::Result<()> {
             run_with_launcher(
                 &launcher,
                 &sanitized_name,
+                &full_sanitized_name,
                 &cwd,
                 auto_attach,
                 debug,
@@ -227,9 +230,41 @@ fn main() -> io::Result<()> {
     Ok(())
 }
 
+/// Resolves the session name to use, based on existing sessions and auto-attach mode.
+/// Returns the existing session name if a match is found (either by truncated or
+/// full sanitized name), otherwise generates a unique name.
+///
+/// This is a pure function extracted for testability — it does no I/O.
+fn resolve_session_name(
+    base_name: &str,
+    full_sanitized: &str,
+    sessions: &[String],
+    auto_attach: bool,
+) -> String {
+    let full_matches = full_sanitized != base_name && sessions.iter().any(|s| s == full_sanitized);
+
+    if auto_attach {
+        if sessions.iter().any(|s| s == base_name) {
+            // Exact match on truncated name
+            base_name.to_string()
+        } else if full_matches {
+            // Match on full (untruncated) sanitized name — session exists
+            // with a longer name that exceeds the 32-char limit
+            full_sanitized.to_string()
+        } else {
+            // Base doesn't exist, but we still need to check for collisions
+            // with other suffixed names (edge case: someone manually created 'myapp-2')
+            get_unique_session_name(base_name, sessions)
+        }
+    } else {
+        // Not in auto-attach mode: always get a unique name
+        get_unique_session_name(base_name, sessions)
+    }
+}
+
 /// Runs the multiplexer launcher when already inside an active multiplexer session.
 /// Instead of creating/attaching to a session, it creates a new window/tab.
-fn run_inside_launcher(
+fn run_inside_session(
     launcher: &dyn MuxLauncher,
     window_name: &str,
     cwd: &std::path::Path,
@@ -253,10 +288,12 @@ fn run_inside_launcher(
     exec_command(&command, args)
 }
 
-/// Runs the multiplexer launcher, selecting a unique session name if needed
+/// Runs the multiplexer launcher, selecting a unique session name if needed.
+/// If already inside the multiplexer, delegates to `run_inside_session` instead.
 fn run_with_launcher(
     launcher: &dyn MuxLauncher,
     base_name: &str,
+    full_sanitized: &str,
     cwd: &std::path::Path,
     auto_attach: bool,
     debug: bool,
@@ -264,45 +301,14 @@ fn run_with_launcher(
 ) -> io::Result<()> {
     // If we're already inside the multiplexer, create a new window instead
     if launcher.is_inside_session() {
-        return run_inside_launcher(launcher, base_name, cwd, debug, args);
+        return run_inside_session(launcher, base_name, cwd, debug, args);
     }
 
     // Get list of existing sessions
     let sessions = launcher.list_sessions()?;
 
-    // Compute the full (untruncated) sanitized name from CWD for matching
-    // against sessions that may exceed the 32-char truncation limit.
-    // Example: CWD "...aircarbon-ac-monorepo2.feat-idx-fcr-008-009" sanitizes
-    // to "...monorepo2-feat-idx-fcr-008-009" (51 chars) but truncates to 32.
-    // We check both the truncated and full names to find existing sessions.
-    let raw_base = get_base_name(cwd);
-    let full_sanitized = sanitize_session_name_full(&raw_base);
-    let full_matches = full_sanitized != base_name && sessions.contains(&full_sanitized);
-
-    // Determine final session name
-    let session_name = if auto_attach {
-        if sessions.contains(&base_name.to_string()) {
-            // Exact match on truncated name
-            base_name.to_string()
-        } else if full_matches {
-            // Match on full (untruncated) sanitized name — session exists
-            // with a longer name that exceeds the 32-char limit
-            if debug {
-                eprintln!(
-                    "[codemux] Matched existing session: {} (via full sanitized name)",
-                    full_sanitized
-                );
-            }
-            full_sanitized
-        } else {
-            // Base doesn't exist, but we still need to check for collisions
-            // with other suffixed names (edge case: someone manually created 'myapp-2')
-            get_unique_session_name(base_name, &sessions)
-        }
-    } else {
-        // Not in auto-attach mode: always get a unique name
-        get_unique_session_name(base_name, &sessions)
-    };
+    // Resolve session name using pure function (testable in isolation)
+    let session_name = resolve_session_name(base_name, full_sanitized, &sessions, auto_attach);
 
     // Debug logging
     if debug {

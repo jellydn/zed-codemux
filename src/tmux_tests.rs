@@ -1,6 +1,32 @@
 use crate::tmux::TmuxLauncher;
 use crate::MuxLauncher;
 
+/// RAII guard that restores an environment variable to its original value on drop.
+/// Ensures env vars are restored even when a test panics.
+struct EnvGuard {
+    key: String,
+    saved: Option<String>,
+}
+
+impl EnvGuard {
+    fn new(key: &str) -> Self {
+        let saved = std::env::var(key).ok();
+        Self {
+            key: key.to_string(),
+            saved,
+        }
+    }
+}
+
+impl Drop for EnvGuard {
+    fn drop(&mut self) {
+        match &self.saved {
+            Some(v) => std::env::set_var(&self.key, v),
+            None => std::env::remove_var(&self.key),
+        }
+    }
+}
+
 #[test]
 fn test_build_command_auto_attach_true() {
     let launcher = TmuxLauncher::new();
@@ -13,29 +39,18 @@ fn test_build_command_auto_attach_true() {
 
 #[test]
 fn test_is_inside_session_false_when_tmux_unset() {
-    // Save and unset TMUX env var to test detection
-    let saved = std::env::var("TMUX").ok();
+    let _guard = EnvGuard::new("TMUX");
     std::env::remove_var("TMUX");
     let launcher = TmuxLauncher::new();
     assert!(!launcher.is_inside_session());
-    // Restore
-    if let Some(val) = saved {
-        std::env::set_var("TMUX", val);
-    }
 }
 
 #[test]
 fn test_is_inside_session_true_when_tmux_set() {
-    let saved = std::env::var("TMUX").ok();
+    let _guard = EnvGuard::new("TMUX");
     std::env::set_var("TMUX", "/tmp/tmux-501/default,1836,0");
     let launcher = TmuxLauncher::new();
     assert!(launcher.is_inside_session());
-    // Restore
-    if let Some(val) = saved {
-        std::env::set_var("TMUX", val);
-    } else {
-        std::env::remove_var("TMUX");
-    }
 }
 
 #[test]
