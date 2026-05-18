@@ -67,4 +67,16 @@ impl MuxLauncher for TmuxLauncher {
             format!("tmux new-session -s {} -c {}", escaped_name, escaped_cwd)
         }
     }
+
+    /// Detects if we're inside a tmux session by checking for the TMUX env var.
+    fn is_inside_session(&self) -> bool {
+        std::env::var("TMUX").is_ok()
+    }
+
+    /// Builds a command to create a new tmux window inside the current session.
+    fn build_inside_command(&self, name: &str, cwd: &str) -> String {
+        let escaped_name = shell_escape(name);
+        let escaped_cwd = shell_escape(cwd);
+        format!("tmux new-window -n {} -c {}", escaped_name, escaped_cwd)
+    }
 }

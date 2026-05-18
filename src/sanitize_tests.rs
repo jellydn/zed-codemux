@@ -1,4 +1,4 @@
-use crate::sanitize::{get_unique_session_name, sanitize_session_name};
+use crate::sanitize::{get_unique_session_name, sanitize_session_name, sanitize_session_name_full};
 
 #[test]
 fn test_unique_empty_list() {
@@ -242,4 +242,58 @@ fn test_one_over_max_length_truncated() {
     let result = sanitize_session_name(&name);
     assert_eq!(result.len(), 32);
     assert_eq!(result, "a".repeat(32));
+}
+
+#[test]
+fn test_sanitize_full_no_truncation() {
+    // Full sanitization should not truncate long names
+    let name = "a".repeat(50);
+    let result = sanitize_session_name_full(&name);
+    assert_eq!(result.len(), 50);
+    assert_eq!(result, name);
+}
+
+#[test]
+fn test_sanitize_full_same_as_truncated_for_short_names() {
+    // For short names, full and truncated should be identical
+    let name = "myapp";
+    assert_eq!(
+        sanitize_session_name_full(name),
+        sanitize_session_name(name)
+    );
+}
+
+#[test]
+fn test_sanitize_full_with_dots() {
+    // Full sanitized should replace dots with dashes but not truncate
+    let name = "2026-02-26-aircarbon-ac-monorepo2.feat-idx-fcr-008-009";
+    let full = sanitize_session_name_full(name);
+    let truncated = sanitize_session_name(name);
+    // Full should preserve the entire name with dots -> dashes
+    assert_eq!(
+        full,
+        "2026-02-26-aircarbon-ac-monorepo2-feat-idx-fcr-008-009"
+    );
+    // Truncated should be shorter
+    assert_eq!(truncated, "2026-02-26-aircarbon-ac-monorepo");
+    assert!(truncated.len() < full.len());
+    // The truncated name should be a prefix of the full name (since truncation
+    // preserves the beginning) — but the truncation boundary may split a word
+    assert!(full.starts_with(&truncated));
+}
+
+#[test]
+fn test_sanitize_full_empty_fallback() {
+    assert_eq!(sanitize_session_name_full(""), "session");
+}
+
+#[test]
+fn test_sanitize_full_only_special_chars() {
+    assert_eq!(sanitize_session_name_full("!!!"), "session");
+}
+
+#[test]
+fn test_sanitize_full_consecutive_dots() {
+    assert_eq!(sanitize_session_name_full("a..b"), "a-b");
+    assert_eq!(sanitize_session_name_full("a...b"), "a-b");
 }
