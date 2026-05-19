@@ -229,6 +229,7 @@ Options:
 |---|---|---|
 | **v1.0** | ✅ Released | Drop-in CLI binary, vscode-mux parity, Homebrew tap, prebuilt binaries, `--init` flag |
 | **v1.1** | ✅ Released | `cargo install codemux` — published to [crates.io](https://crates.io/crates/codemux) |
+| **v1.2** | ✅ Released | Atomic version bumps via `cargo set-version`, streamlined `just publish` flow |
 | **v2.0** | Planned | `codemux kill <name>` subcommand; per-workspace `.codemux.toml`; Zed extension marketplace |
 
 ## Releasing
@@ -247,12 +248,18 @@ gh auth login
 ### Creating a release
 
 ```bash
-# Tag and push (triggers release workflow)
-git tag -a v0.1.0 -m "Release v0.1.0"
-git push origin v0.1.0
+# One-command release (bumps patch, checks, publishes, commits, and tags)
+just publish
 ```
 
-The workflow automatically builds binaries for all platforms, publishes to crates.io, creates a GitHub Release, and updates the Homebrew formula.
+Or manually specify the bump level and use the full release flow:
+
+```bash
+just release patch    # bump patch → check → publish → commit → tag
+just release minor   # bump minor → check → publish → commit → tag
+```
+
+The CI workflow automatically builds binaries for all platforms, publishes to crates.io, creates a GitHub Release, and updates the Homebrew formula.
 
 ## Credits
 
