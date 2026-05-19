@@ -90,10 +90,14 @@ release PART='bump':
     cargo set-version --bump {{PART}}
     NEW_VER=$(cargo metadata --format-version 1 | jq -r '.packages[] | select(.name == "codemux") | .version')
     echo "==> Version: v$NEW_VER"
+    # Sync extension.toml version with the new release version
+    echo "==> Syncing extension.toml..."
+    sed -i.bak "s/^version = \".*\"/version = \"$NEW_VER\"/" extension/extension.toml
+    rm -f extension/extension.toml.bak
     echo "==> Running local checks (fmt)..."
     cargo fmt -- --check
     echo "==> Tagging..."
-    git add -A Cargo.toml Cargo.lock
+    git add -A Cargo.toml Cargo.lock extension/extension.toml
     git commit --no-verify -m "chore: release v$NEW_VER"
     git tag -a "v$NEW_VER" -m "Release v$NEW_VER"
     echo "==> Released v$NEW_VER!"

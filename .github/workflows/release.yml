@@ -108,9 +108,44 @@ jobs:
         # causes Cargo.lock to be updated during publish resolution
         run: cargo publish --allow-dirty
 
+  build-extension:
+    name: Build Zed Extension
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip1
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Build extension
+        run: cargo build --target wasm32-wasip1 --release -p codemux-extension
+
+      - name: Prepare extension artifact
+        run: |
+          mkdir -p dist
+          EXT_VER=$(sed -n 's/^version = "\(.*\)"/\1/p' extension/extension.toml)
+          cp target/wasm32-wasip1/release/codemux_extension.wasm "dist/codemux-extension-v$EXT_VER.wasm"
+          cp extension/extension.toml dist/
+
+      - name: Upload extension artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: codemux-extension
+          path: dist/*
+
   create-release:
     name: Create Release
-    needs: [build-and-release, publish-crates-io]
+    needs: [build-and-release, publish-crates-io, build-extension]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
 
@@ -164,6 +199,12 @@ jobs:
           ```bash
           cargo install --git https://github.com/${{ github.repository }}
           ```
+
+          ### Zed Extension
+          Download `codemux-extension-*.wasm` from the release assets and install it in Zed:
+          1. Open Zed → Extensions → Install Extension → Install From File
+          2. Select the downloaded `.wasm` file
+          3. The extension enables discoverability for the codemux binary
 
           ## Verify Installation
           ```bash
