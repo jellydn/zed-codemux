@@ -40,14 +40,14 @@ checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
 
 [[package]]
 name = "codemux"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "tempfile",
 ]
 
 [[package]]
 name = "codemux-extension"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "zed_extension_api",
 ]
