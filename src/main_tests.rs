@@ -1,5 +1,6 @@
 use crate::{
-    debug_enabled, decide_fallback_shell, get_base_name, resolve_auto_attach, shell_escape, Config,
+    debug_enabled, decide_fallback_shell, get_base_name, resolve_auto_attach, resolve_session_name,
+    shell_escape, Config,
 };
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -272,4 +273,79 @@ fn test_shell_escape_multiple_quotes() {
     assert_eq!(shell_escape("'"), "''\"'\"''");
     assert_eq!(shell_escape("''"), "''\"'\"''\"'\"''");
     assert_eq!(shell_escape("a'b'c"), "'a'\"'\"'b'\"'\"'c'");
+}
+
+// --- resolve_session_name tests ---
+
+#[test]
+fn test_resolve_session_name_truncated_matches_directly() {
+    let sessions = vec!["myapp".to_string()];
+    let result = resolve_session_name("myapp", "myapp", &sessions, true);
+    assert_eq!(result, "myapp");
+}
+
+#[test]
+fn test_resolve_session_name_full_matches_when_truncated_does_not() {
+    let long_session = "2026-02-26-aircarbon-ac-monorepo2-feat-idx-fcr-008-009";
+    let sessions = vec![long_session.to_string()];
+    let base_name = "2026-02-26-aircarbon-ac-monorepo";
+    let result = resolve_session_name(base_name, long_session, &sessions, true);
+    assert_eq!(result, long_session);
+}
+
+#[test]
+fn test_resolve_session_name_full_match_not_in_list() {
+    let long_session = "2026-02-26-aircarbon-ac-monorepo2-feat-idx-fcr-008-009";
+    let sessions: Vec<String> = vec![];
+    let base_name = "2026-02-26-aircarbon-ac-monorepo";
+    let result = resolve_session_name(base_name, long_session, &sessions, true);
+    // Falls through to get_unique_session_name
+    assert_eq!(result, base_name);
+}
+
+#[test]
+fn test_resolve_session_name_truncated_match_takes_priority_over_full() {
+    let long_session = "2026-02-26-aircarbon-ac-monorepo2-feat-idx-fcr-008-009";
+    let short_session = "2026-02-26-aircarbon-ac-monorepo";
+    let sessions = vec![short_session.to_string(), long_session.to_string()];
+    let base_name = "2026-02-26-aircarbon-ac-monorepo";
+    let result = resolve_session_name(base_name, long_session, &sessions, true);
+    // Truncated match takes priority over full match
+    assert_eq!(result, short_session);
+}
+
+#[test]
+fn test_resolve_session_name_auto_attach_false_skips_matching() {
+    let sessions = vec!["myapp".to_string()];
+    // Even though 'myapp' exists, auto_attach=false means always unique
+    let result = resolve_session_name("myapp", "myapp", &sessions, false);
+    assert_eq!(result, "myapp-2");
+}
+
+#[test]
+fn test_resolve_session_name_no_auto_attach_uses_unique_name() {
+    let sessions: Vec<String> = vec![];
+    let result = resolve_session_name("myapp", "myapp", &sessions, false);
+    assert_eq!(result, "myapp");
+}
+
+#[test]
+fn test_resolve_session_name_gap_filling_in_no_attach_mode() {
+    let sessions = vec![
+        "myapp".to_string(),
+        "myapp-2".to_string(),
+        "myapp-3".to_string(),
+        "myapp-5".to_string(),
+    ];
+    // In non-auto-attach mode, always generate unique via gap-filling
+    let result = resolve_session_name("myapp", "myapp", &sessions, false);
+    assert_eq!(result, "myapp-4");
+}
+
+#[test]
+fn test_resolve_session_name_auto_attach_returns_existing() {
+    // In auto-attach mode, if the session exists, return it directly
+    let sessions = vec!["myapp".to_string()];
+    let result = resolve_session_name("myapp", "myapp", &sessions, true);
+    assert_eq!(result, "myapp");
 }

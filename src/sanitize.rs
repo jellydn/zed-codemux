@@ -4,15 +4,9 @@
 /// 32 chars leaves headroom for the session name while staying under the limit.
 const MAX_SESSION_NAME_LENGTH: usize = 32;
 
-/// Sanitizes a workspace name into a tmux/zellij-safe session name.
-/// Matches the exact vscode-mux algorithm with added length limit for zellij compatibility:
-/// - Replace any char not in [a-zA-Z0-9-] with '-'
-/// - Collapse consecutive '-' into one
-/// - Strip leading/trailing '-'
-/// - Truncate to MAX_SESSION_NAME_LENGTH to avoid zellij socket path limits
-/// - Return 'session' if result is empty
-#[inline]
-pub fn sanitize_session_name(name: &str) -> String {
+/// Internal shared sanitization logic (steps 1-5, no truncation).
+/// Returns the fully sanitized name with all vscode-mux compatible transformations applied.
+fn sanitize_internal(name: &str) -> String {
     // Step 1: Replace any character not in [a-zA-Z0-9-] with '-'
     let mut result: Vec<char> = name
         .chars()
@@ -58,8 +52,34 @@ pub fn sanitize_session_name(name: &str) -> String {
         return "session".to_string();
     }
 
+    result.into_iter().collect()
+}
+
+/// Sanitizes a workspace name into a tmux/zellij-safe session name (full length, no truncation).
+/// Matches the exact vscode-mux algorithm:
+/// - Replace any char not in [a-zA-Z0-9-] with '-'
+/// - Collapse consecutive '-' into one
+/// - Strip leading/trailing '-'
+/// - Return 'session' if result is empty
+///
+/// Use this for matching against existing session names that may exceed the 32-char limit.
+#[inline]
+pub fn sanitize_session_name_full(name: &str) -> String {
+    sanitize_internal(name)
+}
+
+/// Sanitizes a workspace name into a tmux/zellij-safe session name.
+/// Matches the exact vscode-mux algorithm with added length limit for zellij compatibility:
+/// - Replace any char not in [a-zA-Z0-9-] with '-'
+/// - Collapse consecutive '-' into one
+/// - Strip leading/trailing '-'
+/// - Truncate to MAX_SESSION_NAME_LENGTH to avoid zellij socket path limits
+/// - Return 'session' if result is empty
+#[inline]
+pub fn sanitize_session_name(name: &str) -> String {
+    let mut result = sanitize_internal(name);
+
     // Step 6: Truncate to max length to avoid zellij IPC socket path limits
-    let mut result: String = result.into_iter().collect();
     if result.len() > MAX_SESSION_NAME_LENGTH {
         // Truncate from the end to preserve the beginning of the name
         result.truncate(MAX_SESSION_NAME_LENGTH);

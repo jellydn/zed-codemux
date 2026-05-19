@@ -88,4 +88,14 @@ impl MuxLauncher for ZellijLauncher {
             )
         }
     }
+
+    // TODO: Detect when running inside a zellij session by checking the ZELLIJ
+    // environment variable (analogous to tmux's $TMUX). When inside zellij,
+    // `is_inside_session()` should return true and `build_inside_command()`
+    // should use `zellij action new-tab` (or similar) to create a new tab
+    // instead of attaching a nested session. See:
+    // https://github.com/jellydn/zed-codemux/pull/12
+    //
+    // The current default implementation falls back to `build_command(name, cwd, true)`
+    // which would run `zellij attach <name> -c` — the wrong behavior when inside zellij.
 }
