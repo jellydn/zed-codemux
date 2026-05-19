@@ -92,9 +92,7 @@ release PART='bump':
     echo "==> Version: v$NEW_VER"
     echo "==> Running local checks (fmt)..."
     cargo fmt -- --check
-    echo "==> Publishing..."
-    cargo publish --allow-dirty
-    NEW_VER=$(cargo metadata --format-version 1 | jq -r '.packages[] | select(.name == "codemux") | .version')
+    echo "==> Tagging..."
     git add -A Cargo.toml Cargo.lock
     git commit -m "chore: release v$NEW_VER"
     git tag -a "v$NEW_VER" -m "Release v$NEW_VER"
