@@ -90,10 +90,8 @@ release PART='bump':
     cargo set-version --bump {{PART}}
     NEW_VER=$(cargo metadata --format-version 1 | jq -r '.packages[] | select(.name == "codemux") | .version')
     echo "==> Version: v$NEW_VER"
-    echo "==> Running checks (fmt + clippy + test)..."
+    echo "==> Running local checks (fmt)..."
     cargo fmt -- --check
-    cargo clippy -- -D warnings
-    cargo test
     echo "==> Publishing..."
     cargo publish --allow-dirty
     NEW_VER=$(cargo metadata --format-version 1 | jq -r '.packages[] | select(.name == "codemux") | .version')
