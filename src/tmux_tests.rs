@@ -1,19 +1,29 @@
 use crate::tmux::TmuxLauncher;
 use crate::MuxLauncher;
+use std::sync::{Mutex, MutexGuard, OnceLock};
 
-/// RAII guard that restores an environment variable to its original value on drop.
+/// Process-global lock that serializes access to environment variable mutations.
+/// Prevents race conditions when tests modify `TMUX` concurrently in parallel
+/// test runs.
+static ENV_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+
+/// RAII guard that acquires the global env lock and restores an environment
+/// variable to its original value on drop.
 /// Ensures env vars are restored even when a test panics.
 struct EnvGuard {
     key: String,
     saved: Option<String>,
+    _lock: MutexGuard<'static, ()>,
 }
 
 impl EnvGuard {
     fn new(key: &str) -> Self {
+        let _lock = ENV_LOCK.get_or_init(|| Mutex::new(())).lock().unwrap();
         let saved = std::env::var(key).ok();
         Self {
             key: key.to_string(),
             saved,
+            _lock,
         }
     }
 }
