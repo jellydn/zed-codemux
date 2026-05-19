@@ -76,21 +76,25 @@ publish:
 
 # Create a git tag for the current version (run after publish)
 tag:
-    @VERSION=$(cargo metadata --format-version 1 | jq -r '.packages[] | select(.name == "codemux") | .version') && \
-    git tag -a "v$$VERSION" -m "Release v$$VERSION" && \
-    echo "Created tag v$$VERSION"
+    #!/usr/bin/env bash
+    set -euo pipefail
+    VERSION=$(cargo metadata --format-version 1 | jq -r '.packages[] | select(.name == "codemux") | .version')
+    git tag -a "v$VERSION" -m "Release v$VERSION"
+    echo "Created tag v$VERSION"
 
-# Full release flow: bump, check, publish, and tag (prompts for version part)
+# Full release flow: bump, check, publish, and tag
 release PART='bump':
-    @echo "==> Bumping version ({{PART}})..."
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "==> Bumping version ({{PART}})..."
     cargo set-version --bump {{PART}}
-    @NEW_VER=$$(cargo metadata --format-version 1 | jq -r '.packages[] | select(.name == "codemux") | .version') && \
-    echo "==> Version: v$$NEW_VER"
-    @just check
-    @echo "==> Publishing..."
+    NEW_VER=$(cargo metadata --format-version 1 | jq -r '.packages[] | select(.name == "codemux") | .version')
+    echo "==> Version: v$NEW_VER"
+    just check
+    echo "==> Publishing..."
     cargo publish --allow-dirty
-    @NEW_VER=$$(cargo metadata --format-version 1 | jq -r '.packages[] | select(.name == "codemux") | .version') && \
-    git add -A Cargo.toml Cargo.lock && \
-    git commit -m "chore: release v$$NEW_VER" && \
-    git tag -a "v$$NEW_VER" -m "Release v$$NEW_VER" && \
-    echo "==> Released v$$NEW_VER!"
+    NEW_VER=$(cargo metadata --format-version 1 | jq -r '.packages[] | select(.name == "codemux") | .version')
+    git add -A Cargo.toml Cargo.lock
+    git commit -m "chore: release v$NEW_VER"
+    git tag -a "v$NEW_VER" -m "Release v$NEW_VER"
+    echo "==> Released v$NEW_VER!"
