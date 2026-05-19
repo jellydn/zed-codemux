@@ -67,14 +67,15 @@ jobs:
       - name: Create release archive
         shell: bash
         run: |
-          mkdir -p dist
-          cp target/${{ matrix.target }}/release/${{ matrix.binary_name }} dist/${{ matrix.asset_name }}
+          mkdir -p dist/stage
+          cp target/${{ matrix.target }}/release/${{ matrix.binary_name }} dist/stage/${{ matrix.binary_name }}
           cd dist
           if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            7z a ${{ matrix.asset_name }}.zip ${{ matrix.asset_name }}
+            7z a ${{ matrix.asset_name }}.zip ./stage/${{ matrix.binary_name }}
           else
-            tar czf ${{ matrix.asset_name }}.tar.gz ${{ matrix.asset_name }}
+            tar czf ${{ matrix.asset_name }}.tar.gz -C stage ${{ matrix.binary_name }}
           fi
+          rm -rf stage
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
