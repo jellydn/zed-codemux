@@ -47,15 +47,28 @@ clean:
 lint:
     prek run --all-files
 
+# Bump version atomically (uses cargo-set-version from cargo-edit)
+bump PART:
+    cargo set-version --bump {{PART}}
+
+# Set exact version atomically
+set-version VERSION:
+    cargo set-version {{VERSION}}
+
 # Dry-run publish to crates.io (verifies package without uploading)
 publish-dry:
     cargo publish --dry-run
 
-# Publish to crates.io (runs checks first, then publishes)
-publish: check publish-dry
-    @echo "Publishing to crates.io..."
-    cargo publish
-    @echo "Published successfully!"
+# Publish to crates.io (bumps patch, runs checks, publishes, tags)
+publish:
+    cargo set-version --bump patch && \
+    NEW_VER=$$(cargo metadata --format-version 1 | jq -r '.packages[] | select(.name == "codemux") | .version') && \
+    echo "Bumped to v$$NEW_VER" && \
+    cargo publish --allow-dirty && \
+    git add -A Cargo.toml Cargo.lock && \
+    git commit -m "chore: release v$$NEW_VER" && \
+    git tag -a "v$$NEW_VER" -m "Release v$$NEW_VER" && \
+    echo "Published v$$NEW_VER and created tag!"
 
 # Create a git tag for the current version (run after publish)
 tag:
@@ -63,6 +76,17 @@ tag:
     git tag -a "v$$VERSION" -m "Release v$$VERSION" && \
     echo "Created tag v$$VERSION"
 
-# Full release flow: check, publish, and tag
-release: publish tag
-    @echo "Release complete!"
+# Full release flow: bump, check, publish, and tag (prompts for version part)
+release PART=bump:
+    @echo "==> Bumping version ({{PART}})..."
+    cargo set-version --bump {{PART}}
+    @NEW_VER=$$(cargo metadata --format-version 1 | jq -r '.packages[] | select(.name == "codemux") | .version') && \
+    echo "==> Version: v$$NEW_VER"
+    @just check
+    @echo "==> Publishing..."
+    cargo publish --allow-dirty
+    @NEW_VER=$$(cargo metadata --format-version 1 | jq -r '.packages[] | select(.name == "codemux") | .version') && \
+    git add -A Cargo.toml Cargo.lock && \
+    git commit -m "chore: release v$$NEW_VER" && \
+    git tag -a "v$$NEW_VER" -m "Release v$$NEW_VER" && \
+    echo "==> Released v$$NEW_VER!"
