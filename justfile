@@ -77,7 +77,7 @@ tag:
     echo "Created tag v$$VERSION"
 
 # Full release flow: bump, check, publish, and tag (prompts for version part)
-release PART=bump:
+release PART='bump':
     @echo "==> Bumping version ({{PART}})..."
     cargo set-version --bump {{PART}}
     @NEW_VER=$$(cargo metadata --format-version 1 | jq -r '.packages[] | select(.name == "codemux") | .version') && \
