@@ -39,6 +39,10 @@ run *ARGS:
 install:
     cargo install --path . --force
 
+# Uninstall local binary
+uninstall:
+    cargo uninstall codemux
+
 # Clean build artifacts
 clean:
     cargo clean
