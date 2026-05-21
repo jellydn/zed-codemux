@@ -175,18 +175,15 @@ jobs:
 
           ```bash
           # macOS (Apple Silicon)
-          curl -L -o codemux https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/codemux-macos-arm64
-          chmod +x codemux
+          curl -L https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/codemux-macos-arm64.tar.gz | tar xz
           sudo mv codemux /usr/local/bin/
 
           # macOS (Intel)
-          curl -L -o codemux https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/codemux-macos-x64
-          chmod +x codemux
+          curl -L https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/codemux-macos-x64.tar.gz | tar xz
           sudo mv codemux /usr/local/bin/
 
           # Linux (x64)
-          curl -L -o codemux https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/codemux-linux-x64
-          chmod +x codemux
+          curl -L https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/codemux-linux-x64.tar.gz | tar xz
           sudo mv codemux /usr/local/bin/
           ```
 

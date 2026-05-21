@@ -61,22 +61,23 @@ brew tap jellydn/tap
 brew install codemux
 ```
 
+> **Already tapped?** Run `brew update` first (or `git -C "$(brew --repo jellydn/tap)" pull`) so Homebrew sees the latest formula. If you previously installed a broken `0.2.0`, run `brew upgrade codemux`.
+
 ### Prebuilt binaries
+
+Release assets are tarballs (`.tar.gz`) on Unix and a zipped `.exe` on Windows:
 
 ```bash
 # macOS (Apple Silicon)
-curl -L -o codemux https://github.com/jellydn/zed-codemux/releases/latest/download/codemux-macos-arm64
-chmod +x codemux
+curl -L https://github.com/jellydn/zed-codemux/releases/latest/download/codemux-macos-arm64.tar.gz | tar xz
 sudo mv codemux /usr/local/bin/
 
 # macOS (Intel)
-curl -L -o codemux https://github.com/jellydn/zed-codemux/releases/latest/download/codemux-macos-x64
-chmod +x codemux
+curl -L https://github.com/jellydn/zed-codemux/releases/latest/download/codemux-macos-x64.tar.gz | tar xz
 sudo mv codemux /usr/local/bin/
 
 # Linux (x64)
-curl -L -o codemux https://github.com/jellydn/zed-codemux/releases/latest/download/codemux-linux-x64
-chmod +x codemux
+curl -L https://github.com/jellydn/zed-codemux/releases/latest/download/codemux-linux-x64.tar.gz | tar xz
 sudo mv codemux /usr/local/bin/
 ```
 
