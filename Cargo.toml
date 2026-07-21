@@ -1,6 +1,6 @@
 [package]
 name = "codemux"
-version = "0.2.4"
+version = "0.3.0"
 edition = "2021"
 authors = ["jellydn <dung@productsway.com>"]
 description = "Drop-in CLI binary that opens Zed terminals inside tmux or zellij — port of vscode-mux to Zed"
