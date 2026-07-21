@@ -81,7 +81,7 @@ impl MuxLauncher for ZellijLauncher {
             // Note: zellij doesn't have a -c option for setting cwd in this mode.
             // The cwd parameter is intentionally ignored here - zellij will start
             // in the current working directory. This differs from tmux behavior.
-            if !cwd.is_empty() && std::env::var("CODEMUX_DEBUG").as_deref() == Ok("1") {
+            if !cwd.is_empty() {
                 eprintln!(
                     "[codemux] Note: zellij cannot set CWD in non-auto-attach mode; using the current directory"
                 );
