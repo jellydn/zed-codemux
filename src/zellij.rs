@@ -64,7 +64,7 @@ impl MuxLauncher for ZellijLauncher {
         }
     }
 
-    fn build_command(&self, name: &str, _cwd: &str, auto_attach: bool) -> String {
+    fn build_command(&self, name: &str, cwd: &str, auto_attach: bool) -> String {
         let escaped_name = shell_escape(name);
         let socket_dir = shell_escape(&get_socket_dir());
 
@@ -79,8 +79,13 @@ impl MuxLauncher for ZellijLauncher {
         } else {
             // Always create new session
             // Note: zellij doesn't have a -c option for setting cwd in this mode.
-            // The _cwd parameter is intentionally ignored here - zellij will start
+            // The cwd parameter is intentionally ignored here - zellij will start
             // in the current working directory. This differs from tmux behavior.
+            if !cwd.is_empty() {
+                eprintln!(
+                    "[codemux] Note: zellij cannot set CWD in non-auto-attach mode; using the current directory"
+                );
+            }
             // Prepend ZELLIJ_SOCKET_DIR to avoid long TMPDIR paths on macOS
             format!(
                 "ZELLIJ_SOCKET_DIR={} zellij -s {}",
