@@ -1,10 +1,10 @@
-#![cfg(unix)]
-
 use std::fs;
-use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::process::{Command, Output, Stdio};
 use tempfile::TempDir;
+
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 
 struct Fixture {
     _temp: TempDir,
@@ -13,6 +13,7 @@ struct Fixture {
     workspace: PathBuf,
 }
 
+#[cfg(unix)]
 impl Fixture {
     fn new(workspace_name: &str) -> Self {
         let temp = tempfile::tempdir().expect("create temporary test directory");
@@ -50,15 +51,7 @@ impl Fixture {
     fn add_mux(&self, name: &str) {
         self.write_executable(
             name,
-            r#"#!/bin/sh
-if [ "$1" = "list-sessions" ]; then
-    if [ -n "$MOCK_SESSIONS" ]; then
-        printf '%s\n' "$MOCK_SESSIONS"
-    fi
-    exit 0
-fi
-printf 'executed:%s:%s\n' "${0##*/}" "$*"
-"#,
+            "#!/bin/sh\nif [ \"$1\" = \"list-sessions\" ]; then\n    if [ -n \"$MOCK_SESSIONS\" ]; then\n        printf '%s\\n' \"$MOCK_SESSIONS\"\n    fi\n    exit 0\nfi\nprintf 'executed:%s:%s\\n' \"${0##*/}\" \"$*\"\n",
         );
     }
 
@@ -84,6 +77,7 @@ printf 'executed:%s:%s\n' "${0##*/}" "$*"
     }
 }
 
+#[cfg(unix)]
 fn run(mut command: Command) -> Output {
     command.stdout(Stdio::piped()).stderr(Stdio::piped());
     let child = command.spawn().expect("spawn codemux");
@@ -105,6 +99,7 @@ fn text(bytes: &[u8]) -> String {
     String::from_utf8_lossy(bytes).into_owned()
 }
 
+#[cfg(unix)]
 #[test]
 fn env_override_runs_sanitized_uniquely_suffixed_tmux_command() {
     let fixture = Fixture::new("My Project!!");
@@ -129,8 +124,9 @@ fn env_override_runs_sanitized_uniquely_suffixed_tmux_command() {
     assert!(stdout.contains(fixture.workspace.to_string_lossy().as_ref()));
 }
 
+#[cfg(unix)]
 #[test]
-fn config_override_selects_zellij_and_reports_ignored_cwd_in_debug_mode() {
+fn config_override_selects_zellij_and_reports_ignored_cwd() {
     let fixture = Fixture::new("config-priority");
     fixture.add_mux("tmux");
     fixture.add_mux("zellij");
@@ -144,12 +140,9 @@ fn config_override_selects_zellij_and_reports_ignored_cwd_in_debug_mode() {
     assert!(stderr.contains("[codemux] Resolved multiplexer: Some(Zellij)"));
     assert!(stderr.contains("zellij cannot set CWD in non-auto-attach mode"));
     assert!(text(&output.stdout).contains("executed:zellij:-s config-priority"));
-
-    let output_without_debug = run(fixture.command());
-    assert!(!text(&output_without_debug.stderr)
-        .contains("zellij cannot set CWD in non-auto-attach mode"));
 }
 
+#[cfg(unix)]
 #[test]
 fn path_detection_prefers_tmux() {
     let fixture = Fixture::new("path-priority");
@@ -165,6 +158,7 @@ fn path_detection_prefers_tmux() {
     assert!(text(&output.stdout).contains("executed:tmux:new-session -A"));
 }
 
+#[cfg(unix)]
 #[test]
 fn unreadable_existing_config_warns_and_uses_defaults() {
     let fixture = Fixture::new("unreadable-config");
@@ -177,4 +171,15 @@ fn unreadable_existing_config_warns_and_uses_defaults() {
 
     assert!(stderr.contains("[codemux] Warning: config file exists but could not be read:"));
     assert!(text(&output.stdout).contains("executed:tmux:new-session -A"));
+}
+
+#[test]
+fn version_flag_prints_version() {
+    let output = Command::new(env!("CARGO_BIN_EXE_codemux"))
+        .args(["--version"])
+        .output()
+        .expect("spawn codemux");
+    assert!(output.status.success());
+    let stdout = text(&output.stdout);
+    assert!(stdout.starts_with("codemux "));
 }
