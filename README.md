@@ -137,10 +137,7 @@ Open a new terminal in Zed — you're now in a tmux/zellij session named after y
 {
   "context": "Workspace",
   "bindings": {
-    "cmd-j": [
-      "task::Spawn",
-      { "task_name": "Open codemux terminal" }
-    ]
+    "cmd-j": ["task::Spawn", { "task_name": "Open codemux terminal" }]
   }
 }
 ```
@@ -171,30 +168,41 @@ auto_attach = true       # default true; same workspace ⇒ shared session
 
 ### Environment variables
 
-| Variable | Default | Description |
-|---|---|---|
-| `CODEMUX_MULTIPLEXER` | (auto-detect) | Force `tmux` or `zellij` |
-| `CODEMUX_AUTO_ATTACH` | `true` | If `false`, every window gets its own suffixed session |
-| `CODEMUX_DEBUG` | `0` | Set to `1` to print debug logs to stderr |
+| Variable              | Default       | Description                                            |
+| --------------------- | ------------- | ------------------------------------------------------ |
+| `CODEMUX_MULTIPLEXER` | (auto-detect) | Force `tmux` or `zellij`                               |
+| `CODEMUX_AUTO_ATTACH` | `true`        | If `false`, every window gets its own suffixed session |
+| `CODEMUX_DEBUG`       | `0`           | Set to `1` to print debug logs to stderr               |
+
+### Warnings
+
+CodeMux prints diagnostics to stderr when something is worth noting:
+
+| Message                                               | Trigger                                                                  |
+| ----------------------------------------------------- | ------------------------------------------------------------------------ |
+| `Warning: config file exists but could not be read:`  | Config file exists but is unreadable (e.g., permission denied)           |
+| `Note: zellij cannot set CWD in non-auto-attach mode` | Zellij in `auto_attach = false` mode; it starts in the current directory |
+
+These are informational only — CodeMux falls back to defaults and continues.
 
 ## Session Naming
 
 Workspace name is derived from the basename of Zed's working directory, then sanitized with the **exact algorithm from [vscode-mux](https://github.com/jellydn/vscode-mux)**:
 
-| Input | Sanitized |
-|---|---|
+| Input          | Sanitized      |
+| -------------- | -------------- |
 | `My Workspace` | `My-Workspace` |
-| `my.project` | `my-project` |
-| `-myproject-` | `myproject` |
-| `...` | `session` |
+| `my.project`   | `my-project`   |
+| `-myproject-`  | `myproject`    |
+| `...`          | `session`      |
 
 When `auto_attach = false`, CodeMux finds the **first available** suffixed name starting at `-2`:
 
-| Existing sessions | Name assigned |
-|---|---|
-| `[]` | `myapp` |
-| `[myapp]` | `myapp-2` |
-| `[myapp, myapp-2]` | `myapp-3` |
+| Existing sessions           | Name assigned        |
+| --------------------------- | -------------------- |
+| `[]`                        | `myapp`              |
+| `[myapp]`                   | `myapp-2`            |
+| `[myapp, myapp-2]`          | `myapp-3`            |
 | `[myapp, myapp-2, myapp-5]` | `myapp-3` (gap-fill) |
 
 ## CLI Reference
@@ -220,22 +228,22 @@ Options:
 
 ## Design Philosophy
 
-| Decision | Why |
-|---|---|
-| **Pure native binary, no Zed extension** | Zed's extension API doesn't expose terminal-profile hooks (yet). Going binary-first is simpler, faster, and works today. |
-| **Zed integration via user config** | Use Zed's existing `settings.json` / `tasks.json` / `keymap.json` — no new APIs to learn, no extension manifests, no marketplace review. |
-| **One Rust crate, one binary** | No `[lib]`, no WASM target. Just `cargo build --release`. |
-| **Zero dependencies** | Pure stdlib — no external crates for the core CLI. |
-| **`exec` model** | Replaces itself with the multiplexer process — no lingering parent. |
+| Decision                                 | Why                                                                                                                                      |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| **Pure native binary, no Zed extension** | Zed's extension API doesn't expose terminal-profile hooks (yet). Going binary-first is simpler, faster, and works today.                 |
+| **Zed integration via user config**      | Use Zed's existing `settings.json` / `tasks.json` / `keymap.json` — no new APIs to learn, no extension manifests, no marketplace review. |
+| **One Rust crate, one binary**           | No `[lib]`, no WASM target. Just `cargo build --release`.                                                                                |
+| **Zero dependencies**                    | Pure stdlib — no external crates for the core CLI.                                                                                       |
+| **`exec` model**                         | Replaces itself with the multiplexer process — no lingering parent.                                                                      |
 
 ## Roadmap
 
-| Version | Status | Highlights |
-|---|---|---|
-| **v1.0** | ✅ Released | Drop-in CLI binary, vscode-mux parity, Homebrew tap, prebuilt binaries, `--init` flag |
-| **v1.1** | ✅ Released | `cargo install codemux` — published to [crates.io](https://crates.io/crates/codemux) |
-| **v1.2** | ✅ Released | Atomic version bumps via `cargo set-version`, streamlined `just publish` flow |
-| **v2.0** | Planned | `codemux kill <name>` subcommand; per-workspace `.codemux.toml`; Zed extension marketplace |
+| Version  | Status      | Highlights                                                                                 |
+| -------- | ----------- | ------------------------------------------------------------------------------------------ |
+| **v1.0** | ✅ Released | Drop-in CLI binary, vscode-mux parity, Homebrew tap, prebuilt binaries, `--init` flag      |
+| **v1.1** | ✅ Released | `cargo install codemux` — published to [crates.io](https://crates.io/crates/codemux)       |
+| **v1.2** | ✅ Released | Atomic version bumps via `cargo set-version`, streamlined `just publish` flow              |
+| **v2.0** | Planned     | `codemux kill <name>` subcommand; per-workspace `.codemux.toml`; Zed extension marketplace |
 
 ## Releasing
 
