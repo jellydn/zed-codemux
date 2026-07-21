@@ -79,6 +79,10 @@ sudo mv codemux /usr/local/bin/
 # Linux (x64)
 curl -L https://github.com/jellydn/zed-codemux/releases/latest/download/codemux-linux-x64.tar.gz | tar xz
 sudo mv codemux /usr/local/bin/
+
+# Linux (ARM64)
+curl -L https://github.com/jellydn/zed-codemux/releases/latest/download/codemux-linux-arm64.tar.gz | tar xz
+sudo mv codemux /usr/local/bin/
 ```
 
 ### Build from source (latest dev)

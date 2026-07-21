@@ -30,6 +30,10 @@ jobs:
             target: x86_64-unknown-linux-gnu
             binary_name: codemux
             asset_name: codemux-linux-x64
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            binary_name: codemux
+            asset_name: codemux-linux-arm64
           - os: macos-latest
             target: x86_64-apple-darwin
             binary_name: codemux
@@ -185,6 +189,10 @@ jobs:
           # Linux (x64)
           curl -L https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/codemux-linux-x64.tar.gz | tar xz
           sudo mv codemux /usr/local/bin/
+
+          # Linux (ARM64)
+          curl -L https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/codemux-linux-arm64.tar.gz | tar xz
+          sudo mv codemux /usr/local/bin/
           ```
 
           ### cargo install
@@ -240,6 +248,7 @@ jobs:
           cd dist
           echo "macos_arm64=$(sha256sum codemux-macos-arm64.tar.gz | cut -d' ' -f1)" >> $GITHUB_OUTPUT
           echo "macos_x64=$(sha256sum codemux-macos-x64.tar.gz | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+          echo "linux_arm64=$(sha256sum codemux-linux-arm64.tar.gz | cut -d' ' -f1)" >> $GITHUB_OUTPUT
           echo "linux_x64=$(sha256sum codemux-linux-x64.tar.gz | cut -d' ' -f1)" >> $GITHUB_OUTPUT
           echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
 
@@ -272,6 +281,10 @@ jobs:
             end
 
             on_linux do
+              on_arm do
+                url "https://github.com/jellydn/zed-codemux/releases/download/v${{ steps.checksums.outputs.version }}/codemux-linux-arm64.tar.gz"
+                sha256 "${{ steps.checksums.outputs.linux_arm64 }}"
+              end
               on_intel do
                 url "https://github.com/jellydn/zed-codemux/releases/download/v${{ steps.checksums.outputs.version }}/codemux-linux-x64.tar.gz"
                 sha256 "${{ steps.checksums.outputs.linux_x64 }}"
@@ -296,4 +309,3 @@ jobs:
           git add Formula/codemux.rb
           git commit -m "codemux ${{ steps.checksums.outputs.version }}"
           git push
-

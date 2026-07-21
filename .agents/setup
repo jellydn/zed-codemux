@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ ! -x "$HOME/.cargo/bin/rustup" ]]; then
+  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable
+fi
+
+"$HOME/.cargo/bin/rustup" component add clippy rustfmt
+
+mkdir -p "$HOME/.local/bin"
+for command in cargo rustc rustup; do
+  ln -sf "$HOME/.cargo/bin/$command" "$HOME/.local/bin/$command"
+done

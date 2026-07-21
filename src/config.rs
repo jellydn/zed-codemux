@@ -61,7 +61,15 @@ pub fn load_config() -> Config {
     let config_path = get_config_path();
     match std::fs::read_to_string(&config_path) {
         Ok(contents) => parse_config_str(&contents),
-        Err(_) => Config::default(),
+        Err(error) => {
+            if error.kind() != io::ErrorKind::NotFound || config_path.exists() {
+                eprintln!(
+                    "[codemux] Warning: config file exists but could not be read: {}",
+                    error
+                );
+            }
+            Config::default()
+        }
     }
 }
 
