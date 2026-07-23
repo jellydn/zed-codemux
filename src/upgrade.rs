@@ -227,6 +227,9 @@ pub fn check_latest() -> Result<String, UpgradeError> {
     let mut cmd = Command::new(&curl);
     cmd.args([
         "-sL",
+        "--fail",
+        "--max-time",
+        "15",
         "-H",
         "Accept: application/vnd.github+json",
         "https://api.github.com/repos/jellydn/zed-codemux/releases/latest",
@@ -370,7 +373,15 @@ fn do_prebuilt_upgrade(
 
     let curl = find_curl()?;
     let status = Command::new(&curl)
-        .args(["-sL", "-o", &archive_path.to_string_lossy(), &download_url])
+        .args([
+            "-sL",
+            "--fail",
+            "--max-time",
+            "60",
+            "-o",
+            &archive_path.to_string_lossy(),
+            &download_url,
+        ])
         .status()
         .map_err(|e| UpgradeError::NetworkError(e.to_string()))?;
 
