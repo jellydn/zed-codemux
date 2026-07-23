@@ -1,152 +1,102 @@
-# Codebase Concerns
+# Concerns
 
-**Analysis Date:** 2026-05-02
+**Analysis Date:** 2026-07-23
 
-## Tech Debt
+## Technical Debt
 
-**Custom TOML Parser:**
-- Issue: config.rs implements a simplified TOML parser instead of using a standard crate like `toml`. The parser has documented limitations: no arrays, no escaped characters, no multi-line strings, no dotted keys.
-- Files: `/Users/huynhdung/conductor/workspaces/2026-05-01-zed-codemux/brisbane/src/config.rs` (lines 66-114)
-- Impact: Future config file extensions may break or require parser rewrites
-- Fix approach: Migrate to `toml` crate if config complexity increases
+### 1. Simplified TOML Parser (`src/config.rs`)
 
-**Process Model - Unix exec() error handling:** ✅ **FIXED**
-- Issue: On Unix, if `exec()` fails, the error message format includes the raw error which may contain unescaped shell path
-- Files: `/Users/huynhdung/conductor/workspaces/2026-05-01-zed-codemux/brisbane/src/main.rs` (lines 232-236, 265-269)
-- Impact: Error message construction could theoretically be exploited if SHELL env var contains malicious input
-- Fix: Applied `shell_escape()` to shell paths in all error messages from `exec_command()` and `run_fallback_shell()` functions
+The config parser is a hand-rolled, lenient TOML parser that:
+- Does not support arrays, tables, inline tables, dotted keys, or escaped characters
+- Accepts unquoted values (non-standard TOML)
+- Silently ignores unknown keys and invalid values
 
-**Zellij CWD limitation:**
-- Issue: zellij.rs build_command ignores the `_cwd` parameter in non-auto-attach mode (line 67-68 comment confirms this). Zellij doesn't support `-c` for setting cwd when creating new sessions via `zellij -s`.
-- Files: `/Users/huynhdung/conductor/workspaces/2026-05-01-zed-codemux/brisbane/src/zellij.rs` (lines 58-69)
-- Impact: Users launching new zellij sessions (auto_attach=false) won't land in the expected directory
-- Fix approach: Document this zellij limitation or contribute upstream feature
+**Risk:** Users may write valid TOML syntax that silently fails to parse. A proper TOML parser (e.g., `toml` crate) would provide validation but would add an external dependency, violating the zero-dependency philosophy.
 
-## Known Bugs
+### 2. Manual JSON Parsing (`src/upgrade.rs`)
 
-**None identified** - No TODO, FIXME, HACK, or XXX comments found in the codebase. The codebase appears clean of known bugs based on code comments.
+`parse_tag_name()` manually extracts `tag_name` from the GitHub API JSON response using string matching. While it handles whitespace around the colon, it:
+- Cannot handle nested objects or unexpected JSON structures
+- Is fragile if GitHub changes the response format
+- Would fail silently if `"tag_name"` appears in a nested context
 
-## Security Considerations
+**Mitigation:** The GitHub Releases API response format is stable. The function returns `Option` and surfaces a `ParseError` on failure.
 
-**Shell Escape Function:**
-- Risk: The `shell_escape` function uses POSIX single-quote escaping. While it has comprehensive tests, any inconsistency in usage could lead to command injection.
-- Files: `/Users/huynhdung/conductor/workspaces/2026-05-01-zed-codemux/brisbane/src/main.rs` (lines 26-33)
-- Current mitigation: All dynamic values (session names, cwd) are escaped before shell command construction. 15 security-focused unit tests cover edge cases including null bytes, control characters, and command injection attempts.
-- Recommendations: Consider using `std::process::Command` with arguments array instead of shell string construction to eliminate the escaping risk entirely
+### 3. `--upgrade` CLI Flags Not Tested
 
-**Sanitize Session Name:**
-- Risk: Session names could contain path traversal sequences or shell metacharacters
-- Files: `/Users/huynhdung/conductor/workspaces/2026-05-01-zed-codemux/brisbane/src/sanitize.rs` (lines 8-54)
-- Current mitigation: Replaces all non-alphanumeric characters (except hyphen) with dashes. Has tests for path traversal patterns (`../../../etc/passwd` becomes `etc-passwd`).
-- Recommendations: Current implementation is solid; 15 unit tests cover security edge cases
+The `--upgrade`, `--check-version`, `--check`, and `--yes` flags are wired into `parse_args()` but have no integration tests in `tests/cli.rs`. The upgrade module's unit tests only cover `parse_version`.
 
-**Release Profile Security Trade-offs:**
-- Risk: `overflow-checks = false` in release profile (line 34 of Cargo.toml) removes protection against integer overflow
-- Files: `/Users/huynhdung/conductor/workspaces/2026-05-01-zed-codemux/brisbane/Cargo.toml`
-- Current mitigation: Codebase doesn't perform complex arithmetic; primarily string manipulation
-- Recommendations: Enable overflow-checks if any arithmetic operations are added in future
+**Risk:** Flag parsing regressions would only be caught manually.
 
-**Environment Variable Injection:**
-- Risk: CODEMUX_MULTIPLEXER, CODEMUX_AUTO_ATTACH values are read without validation beyond case-insensitive string matching
-- Files: `/Users/huynhdung/conductor/workspaces/2026-05-01-zed-codemux/brisbane/src/detect.rs`, `/Users/huynhdung/conductor/workspaces/2026-05-01-zed-codemux/brisbane/src/main.rs`
-- Current mitigation: Values are only used for matching against allowed strings ("tmux", "zellij", "true", "false")
-- Recommendations: Current validation is adequate for the threat model
+### 4. Duplicate `VERSION` Constant
 
-## Performance Bottlenecks
+Both `src/main.rs` and `src/upgrade.rs` define:
+```rust
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+```
 
-**Linear Session Search:**
-- Problem: `get_unique_session_name` uses O(n) linear search through session list
-- Files: `/Users/huynhdung/conductor/workspaces/2026-05-01-zed-codemux/brisbane/src/sanitize.rs` (lines 62-78)
-- Cause: Intentional design choice - sessions typically < 10 items, HashSet overhead not worth it
-- Improvement path: Already optimal for expected use case; documented in code comment
+**Risk:** If version handling changes in one file, the other could become inconsistent. Should be consolidated into a shared constant.
 
-**PATH Probing:**
-- Problem: `find_in_path` iterates through all PATH directories on every binary launch when env/config not set
-- Files: `/Users/huynhdung/conductor/workspaces/2026-05-01-zed-codemux/brisbane/src/detect.rs` (lines 23-46)
-- Cause: No caching of detection results
-- Improvement path: Add memoization if this becomes measurable overhead
+### 5. `run_command()` Simplistic Splitting
 
-## Fragile Areas
+`run_command()` splits the command string on whitespace:
+```rust
+let mut parts = cmd.split_whitespace();
+```
 
-**Extension Stub Implementation:**
-- Files: `/Users/huynhdung/conductor/workspaces/2026-05-01-zed-codemux/brisbane/extension/src/lib.rs`
-- Why fragile: The Zed extension is a minimal stub (13 lines) that only provides discoverability. It doesn't actually bundle or interface with the binary.
-- Safe modification: Any changes to extension structure must maintain compatibility with `zed_extension_api`
-- Test coverage: No tests for the extension crate
+This works for the two known commands (`cargo install codemux --force`, `brew upgrade codemux`) but would break on quoted arguments or arguments containing spaces.
 
-**Platform-Specific Config Path Logic:**
-- Files: `/Users/huynhdung/conductor/workspaces/2026-05-01-zed-codemux/brisbane/src/config.rs` (lines 23-63)
-- Why fragile: Manual platform detection using `#[cfg(target_os = "windows")]` and `#[cfg(unix)]`. XDG_CONFIG_HOME handling is manual.
-- Safe modification: Test on all target platforms (macOS, Linux, Windows) when changing
-- Test coverage: Only unit tests for parsing; no integration tests for config file discovery
+**Mitigation:** Only used for hardcoded command strings. Not exposed for arbitrary user input.
 
-**Windows Process Model Divergence:**
-- Files: `/Users/huynhdung/conductor/workspaces/2026-05-01-zed-codemux/brisbane/src/main.rs` (lines 240-261)
-- Why fragile: Windows uses `Command::status()` + `std::process::exit()` instead of Unix `exec()`. Exit code propagation differs.
-- Safe modification: Test Windows builds explicitly; verify exit code behavior
-- Test coverage: Windows-specific code paths are cfg-gated and may not execute in CI (GitHub Actions does test on windows-latest)
+### 6. Zellij Inside-Session Detection (TODO in `src/zellij.rs`)
 
-## Scaling Limits
+The `ZellijLauncher` does not implement `is_inside_session()`:
+```rust
+// TODO: Detect when running inside a zellij session ...
+// See: https://github.com/jellydn/zed-codemux/pull/12
+```
 
-**Session Name Collisions:**
-- Current capacity: Session names can theoretically grow indefinitely with suffixes (myapp-2, myapp-3, ...myapp-N)
-- Limit: No hard limit on session count; zellij/tmux may have practical limits
-- Scaling path: Document limits if users report issues with hundreds of windows
+**Impact:** When running inside zellij, creating a new terminal triggers `zellij attach <name> -c` (nested session) instead of `zellij action new-tab`.
 
-## Dependencies at Risk
+## Security
 
-**zed_extension_api:**
-- Risk: Version 0.1 is early/pre-release API
-- Impact: Extension may break with Zed updates
-- Migration plan: Monitor Zed extension API releases; the extension is minimal and easy to update
+### 1. curl `--fail` Now Present (Fixed)
 
-**Zero runtime dependencies:**
-- The main `codemux` binary has no crate dependencies (Cargo.toml shows empty `[dependencies]` section)
-- This is actually a strength - minimal supply chain attack surface
+`--fail` and `--max-time` have been added to both curl calls in `src/upgrade.rs`. Previously, HTTP errors (404, 500) would silently succeed and produce unexpected output.
 
-## Missing Critical Features
+### 2. Temporary Directory Permissions (Fixed)
 
-**Kill Subcommand:**
-- Problem: No `codemux kill <name>` command to terminate sessions
-- Blocks: Users must use native `tmux kill-session` or `zellij kill-session`
-- Note: Documented as out of scope for v1, planned for v2.0
+The prebuilt upgrade temp directory now uses:
+- Unique name with PID: `codemux-upgrade-{PID}`
+- Restrictive permissions: `0o700` on Unix
 
-**Per-Workspace Configuration:**
-- Problem: No `.codemux.toml` in project directories for per-workspace overrides
-- Blocks: Project-specific multiplexer settings require manual env var/config file switching
-- Note: Documented as v2.0 feature
+Previously used a static name (`codemux-upgrade`) without restrictive permissions, creating a symlink/race risk.
 
-**Multi-Root Workspace Support:**
-- Problem: Only uses terminal CWD, doesn't handle Zed's multi-root workspaces
-- Blocks: In multi-root projects, session names may not match expected workspace semantics
-- Note: Documented as v2.0 feature
+### 3. Orphaned Temp File Cleanup (Fixed)
 
-## Test Coverage Gaps
+If `replace_binary()` fails (e.g., permission denied), the temporary `.codemux-upgrade-tmp` file is now cleaned up via `remove_file()` in the error path.
 
-**PATH-Based Detection:** ✅ **FIXED**
-- What's not tested: The actual `find_in_path` function that scans filesystem for tmux/zellij binaries
-- Files: `/Users/huynhdung/conductor/workspaces/2026-05-01-zed-codemux/brisbane/src/detect.rs` (lines 23-46, 75-86)
-- Risk: PATH parsing edge cases (empty entries, malformed paths, Windows .exe handling)
-- Fix: Refactored `find_in_path` to use a testable helper `find_in_path_with_env()` and added 4 comprehensive tests covering: finding binaries in PATH, missing binaries, empty PATH entries, and multiple directory search
+### 4. Shell Injection Prevention
 
-**Actual Multiplexer Integration:**
-- What's not tested: No tests actually run tmux or zellij commands
-- Files: `/Users/huynhdung/conductor/workspaces/2026-05-01-zed-codemux/brisbane/src/tmux.rs`, `/Users/huynhdung/conductor/workspaces/2026-05-01-zed-codemux/brisbane/src/zellij.rs`
-- Risk: tmux/zellij CLI changes could break integration
-- Priority: Medium - These are external dependencies; integration tests would require test environment setup
+`shell_escape()` wraps all user-controlled strings in single quotes before embedding in shell commands. This prevents injection from session names, paths, or CLI arguments.
 
-**Exec/Process Replacement:**
-- What's not tested: The actual `exec_command` and `run_fallback_shell` functions don't have tests for the actual process replacement behavior
-- Files: `/Users/huynhdung/conductor/workspaces/2026-05-01-zed-codemux/brisbane/src/main.rs` (lines 222-296)
-- Risk: Platform-specific exec behavior regressions
-- Priority: Low - Platform-specific and hard to test in unit test framework; covered by CI builds
+## Performance
 
-**Windows-Specific Path Handling:**
-- What's not tested: Windows COMSPEC fallback, .exe detection in PATH
-- Files: `/Users/huynhdung/conductor/workspaces/2026-05-01-zed-codemux/brisbane/src/detect.rs` (lines 31-38), `/Users/huynhdung/conductor/workspaces/2026-05-01-zed-codemux/brisbane/src/main.rs` (lines 108-118)
-- Risk: Windows-specific code paths may have subtle bugs
-- Priority: Low - CI runs on windows-latest; manual verification may be needed
+- **Session listing**: Linear scan of existing sessions for collision detection (`O(n)`). Adequate for typical usage (< 10 sessions).
+- **PATH probing**: Manual directory traversal in `which()` and `find_in_path()`. Could be slow on systems with large PATH, but the probe is a one-time startup cost.
+- **Zero allocation in hot path**: `shell_escape()` uses `format!()` (allocates), but it's called once per invocation.
 
----
+## Dependencies
 
-*Concerns audit: 2026-05-02*
+- **Root crate**: Zero runtime dependencies — a deliberate design choice. This simplifies audit, reduces build times, and eliminates supply-chain risk.
+- **Extension crate**: Only `zed_extension_api = "0.7"` — a required dependency for Zed extension compatibility.
+- **Dev only**: `tempfile = "3.10"` — well-audited, widely used crate.
+
+## Platform Gaps
+
+| Concern | Detail |
+|---------|--------|
+| Windows upgrade | `upgrade()` returns `WindowsNotSupported` — prebuilt binary replacement not implemented |
+| Zellij CWD | In non-auto-attach mode, zellij ignores the `-c` flag — warns to stderr |
+| Zellij socket path | Uses `/tmp/z` instead of `$TMPDIR` to avoid 103-byte IPC socket limit on macOS |
+| ARM Linux CI | `ubuntu-24.04-arm` runner is relatively new — may have limited availability |
