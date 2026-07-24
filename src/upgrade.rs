@@ -188,7 +188,6 @@ pub enum InstallMethod {
 }
 
 /// Detects the installation method by inspecting the current executable path.
-#[cfg(not(windows))]
 pub fn detect_install_method() -> InstallMethod {
     let exe = std::env::current_exe().ok();
     match exe.as_ref().and_then(|p| p.to_str()) {
@@ -200,7 +199,6 @@ pub fn detect_install_method() -> InstallMethod {
     }
 }
 
-#[cfg(not(windows))]
 fn platform_asset_name() -> Result<&'static str, UpgradeError> {
     match (std::env::consts::OS, std::env::consts::ARCH) {
         ("macos", "aarch64") => Ok("codemux-macos-arm64.tar.gz"),
@@ -212,7 +210,6 @@ fn platform_asset_name() -> Result<&'static str, UpgradeError> {
     }
 }
 
-#[cfg(not(windows))]
 fn prompt_yes_no(prompt: &str) -> bool {
     eprint!("{} [Y/n]: ", prompt);
     let mut input = String::new();
@@ -271,8 +268,16 @@ pub fn check_version_only() -> Result<String, UpgradeError> {
 ///
 /// When `check_only` is true, reports whether an update is available without
 /// performing the upgrade. When `yes` is true, skips the confirmation prompt.
-#[cfg(not(windows))]
+///
+/// On Windows this returns `WindowsNotSupported` — use `check_version_only()`
+/// to check for new releases on Windows instead.
+#[cfg_attr(windows, allow(unreachable_code, unused_variables))]
 pub fn upgrade(check_only: bool, yes: bool) -> Result<UpgradeResult, UpgradeError> {
+    #[cfg(windows)]
+    {
+        return Err(UpgradeError::WindowsNotSupported);
+    }
+
     let latest_tag = check_latest()?;
     let latest_ver = latest_tag.strip_prefix('v').unwrap_or(&latest_tag);
 
@@ -311,14 +316,7 @@ pub fn upgrade(check_only: bool, yes: bool) -> Result<UpgradeResult, UpgradeErro
     }
 }
 
-/// Windows stub: upgrade is not yet supported on Windows.
-#[cfg(windows)]
-pub fn upgrade(_check_only: bool, _yes: bool) -> Result<UpgradeResult, UpgradeError> {
-    Err(UpgradeError::WindowsNotSupported)
-}
-
 /// Prompts the user and optionally runs an external package-manager upgrade command.
-#[cfg(not(windows))]
 fn handle_external_upgrade(
     cmd: &str,
     label: &str,
@@ -340,7 +338,6 @@ fn handle_external_upgrade(
 }
 
 /// Downloads and atomically replaces the current binary with the latest prebuilt release.
-#[cfg(not(windows))]
 fn perform_prebuilt_upgrade(
     latest_tag: &str,
     latest_ver: &str,
@@ -367,7 +364,6 @@ fn perform_prebuilt_upgrade(
 }
 
 /// Core prebuilt upgrade logic (download, extract, replace, verify).
-#[cfg(not(windows))]
 fn do_prebuilt_upgrade(
     latest_tag: &str,
     latest_ver: &str,
@@ -431,7 +427,6 @@ fn do_prebuilt_upgrade(
     })
 }
 
-#[cfg(not(windows))]
 fn run_command(cmd: &str) -> Result<(), UpgradeError> {
     let mut parts = cmd.split_whitespace();
     let program = parts.next().unwrap_or(cmd);
@@ -446,7 +441,6 @@ fn run_command(cmd: &str) -> Result<(), UpgradeError> {
     Ok(())
 }
 
-#[cfg(not(windows))]
 fn replace_binary(
     new_binary: &std::path::Path,
     current: &std::path::Path,
@@ -479,7 +473,6 @@ fn replace_binary(
     Ok(())
 }
 
-#[cfg(not(windows))]
 fn verify_version(binary: &std::path::Path, expected: &str) -> Result<(), UpgradeError> {
     let output = Command::new(binary)
         .arg("--version")
