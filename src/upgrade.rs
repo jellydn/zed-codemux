@@ -268,12 +268,8 @@ pub fn check_version_only() -> Result<String, UpgradeError> {
 ///
 /// When `check_only` is true, reports whether an update is available without
 /// performing the upgrade. When `yes` is true, skips the confirmation prompt.
+#[cfg(not(windows))]
 pub fn upgrade(check_only: bool, yes: bool) -> Result<UpgradeResult, UpgradeError> {
-    #[cfg(windows)]
-    {
-        return Err(UpgradeError::WindowsNotSupported);
-    }
-
     let latest_tag = check_latest()?;
     let latest_ver = latest_tag.strip_prefix('v').unwrap_or(&latest_tag);
 
@@ -310,6 +306,12 @@ pub fn upgrade(check_only: bool, yes: bool) -> Result<UpgradeResult, UpgradeErro
             perform_prebuilt_upgrade(&latest_tag, latest_ver, &current_exe)
         }
     }
+}
+
+/// Windows stub: upgrade is not yet supported on Windows.
+#[cfg(windows)]
+pub fn upgrade(_check_only: bool, _yes: bool) -> Result<UpgradeResult, UpgradeError> {
+    Err(UpgradeError::WindowsNotSupported)
 }
 
 /// Prompts the user and optionally runs an external package-manager upgrade command.
