@@ -214,10 +214,32 @@ Arguments:
   [ARGS]...  Additional arguments to pass to the shell
 
 Options:
-  -h, --help     Print help
-      --init     Create default config file at ~/.config/codemux/config.toml
-  -V, --version  Print version
+  -h, --help          Print help
+      --init          Create default config file at ~/.config/codemux/config.toml
+  -V, --version       Print version
+      --check-version  Check GitHub for the latest version
+      --upgrade        Update codemux to the latest release
+                       (accepts --check for dry-run, --yes to skip prompts)
 ```
+
+## Upgrading
+
+CodeMux can update itself to the latest release:
+
+```bash
+# Check if a newer version is available
+codemux --check-version
+
+# Upgrade to the latest version (interactive)
+codemux --upgrade
+
+# Upgrade without prompts
+codemux --upgrade --yes
+```
+
+- **Cargo** installations: runs `cargo install codemux --force`
+- **Homebrew** installations: runs `brew upgrade codemux`
+- **Prebuilt binary** installations: downloads and atomically replaces the current binary
 
 ## Requirements
 

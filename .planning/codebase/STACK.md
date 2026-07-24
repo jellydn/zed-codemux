@@ -1,104 +1,72 @@
 # Technology Stack
 
-**Analysis Date:** 2026-05-02
+**Analysis Date:** 2026-07-23
 
-## Languages
+## Language & Runtime
 
-**Primary:**
-- Rust (Edition 2021, Minimum Rust Version 1.70) - Main CLI binary implementation (`src/*.rs`)
-- TOML - Configuration files (`Cargo.toml`, `config.toml`, `prek.toml`, `extension.toml`)
+| Item | Value |
+|------|-------|
+| Language | Rust |
+| Edition | 2021 |
+| Minimum Rust | 1.70 |
+| Binary name | `codemux` |
 
-**Secondary:**
-- YAML - CI/CD workflow definitions (`.github/workflows/*.yml`)
-- Shell (Just) - Task runner scripts (`justfile`)
+## Build System
 
-## Runtime
+| Item | Value |
+|------|-------|
+| Build tool | `cargo` |
+| Task runner | `just` ([`justfile`](../../justfile)) |
+| Pre-commit hooks | `prek` ([`prek.toml`](../../prek.toml)) |
+| Release profile | `opt-level = "s"`, LTO, stripped, `panic = "abort"`, single codegen unit |
 
-**Environment:**
-- Native binary (no runtime required)
-- Cross-platform: macOS, Linux, Windows
+## Workspace Structure
 
-**Package Manager:**
-- Cargo - Rust package manager and build system
-- Lockfile: `Cargo.lock` present (version 3)
+```
+[workspace]
+members = ["extension"]
+resolver = "2"
+```
 
-## Frameworks
+- **Root crate** (`codemux`): binary target at `src/main.rs`
+- **Extension crate** (`codemux-extension`): cdylib for Zed extension at `extension/src/lib.rs`
 
-**Core:**
-- Standard library only (`std::process`, `std::env`, `std::io`, `std::collections`)
-- No external runtime frameworks
+## Dependencies
 
-**Testing:**
-- Built-in Rust test framework (`#[cfg(test)]` modules)
-- `tempfile` 3.27.0 - Temporary file/directory creation for tests
+### Runtime (root crate)
 
-**Build/Dev:**
-- Cargo - Build system (`cargo build`, `cargo test`)
-- Clippy - Linting (`cargo clippy`)
-- rustfmt - Code formatting (`cargo fmt`)
-- Just - Task runner (`just build`, `just test`, `just check`)
-- Prek - Git hooks framework (`prek run --all-files`)
+**Zero external dependencies.** Uses Rust stdlib exclusively (`std::fmt`, `std::io`, `std::path`, `std::process`, `std::collections`).
 
-## Key Dependencies
+### Runtime (extension crate)
 
-**Main Binary (`/Users/huynhdung/conductor/workspaces/2026-05-01-zed-codemux/brisbane/Cargo.toml`):**
-- None (zero runtime dependencies - pure std library)
+| Crate | Version | Purpose |
+|-------|---------|---------|
+| `zed_extension_api` | 0.7 | Zed extension registration |
 
-**Development Dependencies:**
-- `tempfile` 3.27.0 - Cross-platform temporary file utilities for testing
+### Dev Dependencies
 
-**Extension (`/Users/huynhdung/conductor/workspaces/2026-05-01-zed-codemux/brisbane/extension/Cargo.toml`):**
-- `zed_extension_api` 0.1 - Zed editor extension API for WASM-based plugin
-
-**Build-time Dependencies (from `Cargo.lock`):**
-- `wit-bindgen` 0.51.0/0.57.1 - WIT bindings generation for WASM components
-- `wasm-encoder` 0.244.0 - WebAssembly binary encoding
-- `wasmparser` 0.244.0 - WebAssembly binary parsing
+| Crate | Version | Purpose |
+|-------|---------|---------|
+| `tempfile` | 3.10 | Temporary directories for integration tests (`tests/cli.rs`) |
 
 ## Configuration
 
-**Environment Variables:**
-- `CODEMUX_MULTIPLEXER` - Force multiplexer selection (`tmux` or `zellij`)
-- `CODEMUX_AUTO_ATTACH` - Control session auto-attachment (`true`/`false`)
-- `CODEMUX_DEBUG` - Enable debug logging to stderr (`1` for enabled)
-- `SHELL` - Fallback shell path (Unix)
-- `COMSPEC` - Fallback shell path (Windows)
-- `XDG_CONFIG_HOME` - Config directory override
-- `HOME`/`APPDATA` - Platform-specific config directories
+| File | Purpose |
+|------|---------|
+| `Cargo.toml` | Root package manifest, workspace definition |
+| `extension/Cargo.toml` | Extension crate manifest |
+| `extension/extension.toml` | Zed extension metadata (id, name, version) |
+| `justfile` | Task definitions (build, test, release, publish) |
+| `prek.toml` | Pre-commit hook configuration (fmt, clippy, test) |
+| `renovate.json` | Dependency update automation |
 
-**Config Files:**
-- `~/.config/codemux/config.toml` - User configuration (multiplexer preference, auto_attach)
-- `Cargo.toml` - Build configuration with optimized release profile
-- `justfile` - Development task definitions
-- `prek.toml` - Git hook configuration (fmt, clippy, test)
+## Platform Targets
 
-**Release Profile (`Cargo.toml` lines 28-35):**
-- `opt-level = "s"` - Optimize for size
-- `lto = true` - Link-time optimization enabled
-- `strip = true` - Strip symbols
-- `panic = "abort"` - Abort on panic
-- `codegen-units = 1` - Single codegen unit for maximum optimization
-- `overflow-checks = false` - Disable overflow checks in release
-
-## Platform Requirements
-
-**Development:**
-- Rust toolchain (stable, >= 1.70)
-- `clippy` and `rustfmt` components
-- Just task runner (`cargo install just`)
-- Prek git hooks framework
-
-**Production:**
-- No runtime dependencies
-- Requires `tmux` or `zellij` in PATH for multiplexer functionality
-- Falls back to system shell if neither multiplexer is available
-
-**Target Platforms:**
-- x86_64-unknown-linux-gnu (Linux x64)
-- x86_64-apple-darwin (macOS Intel)
-- aarch64-apple-darwin (macOS Apple Silicon)
-- x86_64-pc-windows-msvc (Windows x64)
-
----
-
-*Stack analysis: 2026-05-02*
+| OS | Arch | Binary Asset |
+|----|------|-------------|
+| macOS | aarch64 | `codemux-macos-arm64.tar.gz` |
+| macOS | x86_64 | `codemux-macos-x64.tar.gz` |
+| Linux | aarch64 | `codemux-linux-arm64.tar.gz` |
+| Linux | x86_64 | `codemux-linux-x64.tar.gz` |
+| Windows | x86_64 | `codemux-windows-x64.exe.zip` |
+| WASI | wasm32 | `codemux_extension.wasm` (Zed extension) |

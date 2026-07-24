@@ -1,120 +1,60 @@
 # External Integrations
 
-**Analysis Date:** 2026-05-02
+**Analysis Date:** 2026-07-23
 
-## APIs & External Services
+## External APIs
 
-**None** - This is a standalone CLI tool with no network dependencies or external API calls.
+| Service | Purpose | Called From | Authentication |
+|---------|---------|-------------|----------------|
+| GitHub Releases API (`api.github.com/repos/jellydn/zed-codemux/releases/latest`) | Fetch latest release tag for self-upgrade | `src/upgrade.rs::check_latest()` | None (public API) |
+| GitHub Releases (download) | Download prebuilt binary tarball | `src/upgrade.rs::do_prebuilt_upgrade()` | None |
 
-## Data Storage
+## Distribution Channels
 
-**Databases:**
-- None - No database integration
+| Channel | Details |
+|---------|---------|
+| **crates.io** | Published as `codemux` crate. Token: `CARGO_REGISTRY_TOKEN` secret in CI |
+| **Homebrew** | Formula at `jellydn/homebrew-tap/Formula/codemux.rb`. Token: `HOMEBREW_TAP_TOKEN` |
+| **GitHub Releases** | Prebuilt binaries for 5 platform targets, auto-uploaded on tag push |
+| **Zed Extension** | `.wasm` binary uploaded as release asset, registered via `zed_extension_api` |
 
-**File Storage:**
-- Local filesystem only
-- Config file: `~/.config/codemux/config.toml` (or platform equivalent)
-- Uses platform-specific directories:
-  - Unix: `$XDG_CONFIG_HOME/codemux/config.toml` or `~/.config/codemux/config.toml`
-  - Windows: `%APPDATA%\codemux\config.toml`
+## CI/CD
 
-**Caching:**
-- None - No caching layer
+| Provider | Workflow | Trigger |
+|----------|----------|---------|
+| GitHub Actions | `.github/workflows/ci.yml` | Push, PR to `main` |
+| GitHub Actions | `.github/workflows/release.yml` | Tag push (`v*`) or manual dispatch |
 
-## Authentication & Identity
+### CI Checks
 
-**Auth Provider:**
-- None - No authentication required
+- Build + test on `ubuntu-latest`, `macos-latest`, `windows-latest`
+- `cargo clippy -- -D warnings`
+- `cargo fmt --check`
+- GitGuardian secret scanning
+- Socket Security vulnerability scanning
 
-## External Binaries
+### Release Pipeline
 
-**Terminal Multiplexers (optional runtime dependencies):**
-- `tmux` - Terminal multiplexer (preferred if available on PATH)
-  - Commands used: `tmux new-session -A -s <name> -c <cwd>`, `tmux list-sessions -F '#{session_name}'`
-- `zellij` - Modern terminal multiplexer (fallback option)
-  - Commands used: `zellij attach <name> -c`, `zellij list-sessions -n`
+1. Build binaries for all 5 platform targets (parallel matrix)
+2. Publish to crates.io
+3. Build Zed extension (wasm32-wasip1)
+4. Create GitHub Release with release notes
+5. Update Homebrew formula in `jellydn/homebrew-tap`
 
-**Shell:**
-- `$SHELL` (Unix) or `$COMSPEC` (Windows) - Fallback when no multiplexer available
-- `/bin/sh` - Default fallback on Unix
-- `cmd.exe` - Default fallback on Windows
+## Tools Accessed at Runtime
 
-## Monitoring & Observability
+| Tool | Purpose | Fallback |
+|------|---------|----------|
+| `curl` | GitHub API requests + binary downloads | Falls back to `pwsh.exe` on Windows; errors if not found |
+| `tar` | Extract prebuilt binary tarballs | None (required for prebuilt upgrade path) |
+| `tmux` | Terminal multiplexer (session creation, listing) | Graceful fallback to zellij or `$SHELL` |
+| `zellij` | Terminal multiplexer (session creation, listing) | Graceful fallback to tmux or `$SHELL` |
 
-**Error Tracking:**
-- None - Errors printed to stderr
+## Configuration Files
 
-**Logs:**
-- Debug logging to stderr when `CODEMUX_DEBUG=1`
-- No persistent log files
-
-## CI/CD & Deployment
-
-**Hosting:**
-- GitHub Releases - Binary distribution via `softprops/action-gh-release@v1`
-- Future: Homebrew tap (planned v1.1)
-- Future: crates.io (`cargo install`) (planned v1.1)
-
-**CI Pipeline (`.github/workflows/ci.yml`):**
-- GitHub Actions - triggered on push/PR to main branch
-- Matrix builds: ubuntu-latest, macos-latest, windows-latest
-- Steps:
-  1. `actions/checkout@v4` - Source checkout
-  2. `dtolnay/rust-toolchain@stable` - Rust toolchain with clippy, rustfmt
-  3. `Swatinem/rust-cache@v2` - Dependency caching
-  4. `cargo build --release` - Build
-  5. `cargo test` - Run tests
-  6. `cargo clippy -- -D warnings` - Linting
-  7. `cargo fmt --check` - Format check
-
-**Release Pipeline (`.github/workflows/release.yml`):**
-- Triggered on tags (`v*`) or manual dispatch
-- Matrix builds for 4 targets:
-  - `x86_64-unknown-linux-gnu` → `codemux-linux-x64.tar.gz`
-  - `x86_64-apple-darwin` → `codemux-macos-x64.tar.gz`
-  - `aarch64-apple-darwin` → `codemux-macos-arm64.tar.gz`
-  - `x86_64-pc-windows-msvc` → `codemux-windows-x64.exe.zip`
-- Binary stripping on Unix platforms
-- Archive creation (tar.gz for Unix, zip for Windows)
-- GitHub Release creation with auto-generated notes
-
-**Dependency Updates:**
-- Renovate Bot (`.github/renovate.json`)
-  - Schema: `https://docs.renovatebot.com/renovate-schema.json`
-  - Extends: `config:recommended`
-
-## Environment Configuration
-
-**Required env vars:**
-- None required - all have sensible defaults
-
-**Optional env vars:**
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `CODEMUX_MULTIPLEXER` | auto-detect | Force `tmux` or `zellij` |
-| `CODEMUX_AUTO_ATTACH` | `true` | Enable session auto-attachment |
-| `CODEMUX_DEBUG` | `0` | Enable debug output to stderr |
-| `XDG_CONFIG_HOME` | platform-specific | Config directory override |
-
-**Secrets location:**
-- None - No secrets required
-
-## Webhooks & Callbacks
-
-**Incoming:**
-- None
-
-**Outgoing:**
-- None
-
-## Editor Integration
-
-**Zed Editor:**
-- Integration via `settings.json` terminal shell configuration
-- Alternative: Zed tasks (`tasks.json`) with keybindings (`keymap.json`)
-- Extension manifest (`extension/extension.toml`) for discoverability
-- WASM extension stub (`extension/src/lib.rs`) using `zed_extension_api`
-
----
-
-*Integration audit: 2026-05-02*
+| File | Format | Purpose |
+|------|--------|---------|
+| `~/.config/codemux/config.toml` | TOML | User configuration (multiplexer preference, auto-attach) |
+| `~/.config/zed/settings.json` | JSON | Zed terminal shell configuration (Option A) |
+| `~/.config/zed/tasks.json` | JSON | Zed task definitions (Option B) |
+| `~/.config/zed/keymap.json` | JSON | Zed keybindings |

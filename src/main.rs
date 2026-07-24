@@ -2,6 +2,7 @@ mod config;
 mod detect;
 mod sanitize;
 mod tmux;
+mod upgrade;
 mod zellij;
 
 use crate::config::{create_default_config, load_config, Config, ConfigInitResult};
@@ -54,7 +55,7 @@ pub(crate) fn shell_escape(value: &str) -> String {
     format!("'{}'", value.replace('\'', "'\"'\"'"))
 }
 
-const VERSION: &str = env!("CARGO_PKG_VERSION");
+pub(crate) const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Simple CLI parser for --version, --help, and --init
 fn parse_args() -> Vec<String> {
@@ -65,6 +66,27 @@ fn parse_args() -> Vec<String> {
             "-v" | "--version" | "-V" => {
                 println!("codemux {}", VERSION);
                 std::process::exit(0);
+            }
+            "--check-version" => match upgrade::check_version_only() {
+                Ok(latest) => {
+                    println!("Latest version: v{} (current: v{})", latest, VERSION);
+                    std::process::exit(0);
+                }
+                Err(e) => {
+                    eprintln!("codemux: {}", e);
+                    std::process::exit(1);
+                }
+            },
+            "--upgrade" => {
+                let check_only = args.iter().any(|a| a == "--check");
+                let yes = args.iter().any(|a| a == "--yes");
+                match upgrade::upgrade(check_only, yes) {
+                    Ok(_) => std::process::exit(0),
+                    Err(e) => {
+                        eprintln!("codemux: {}", e);
+                        std::process::exit(1);
+                    }
+                }
             }
             "-h" | "--help" | "-?" => {
                 println!("codemux {}", VERSION);
