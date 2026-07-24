@@ -55,7 +55,7 @@ pub(crate) fn shell_escape(value: &str) -> String {
     format!("'{}'", value.replace('\'', "'\"'\"'"))
 }
 
-const VERSION: &str = env!("CARGO_PKG_VERSION");
+pub(crate) const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Simple CLI parser for --version, --help, and --init
 fn parse_args() -> Vec<String> {

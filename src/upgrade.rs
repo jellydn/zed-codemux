@@ -3,8 +3,6 @@ use std::io;
 use std::path::PathBuf;
 use std::process::Command;
 
-const VERSION: &str = env!("CARGO_PKG_VERSION");
-
 /// Result of a successful upgrade operation.
 #[derive(Debug, Clone, PartialEq)]
 pub struct UpgradeResult {
@@ -279,16 +277,20 @@ pub fn upgrade(check_only: bool, yes: bool) -> Result<UpgradeResult, UpgradeErro
     let latest_tag = check_latest()?;
     let latest_ver = latest_tag.strip_prefix('v').unwrap_or(&latest_tag);
 
-    if version_cmp(&latest_tag, &format!("v{}", VERSION)) != std::cmp::Ordering::Greater {
+    if version_cmp(&latest_tag, &format!("v{}", crate::VERSION)) != std::cmp::Ordering::Greater {
         return Err(UpgradeError::AlreadyLatest {
-            current: VERSION.to_string(),
+            current: crate::VERSION.to_string(),
         });
     }
 
     if check_only {
-        println!("Latest version: v{} (current: v{})", latest_ver, VERSION);
+        println!(
+            "Latest version: v{} (current: v{})",
+            latest_ver,
+            crate::VERSION
+        );
         return Ok(UpgradeResult {
-            previous: VERSION.to_string(),
+            previous: crate::VERSION.to_string(),
             current: latest_ver.to_string(),
             path: std::env::current_exe().unwrap_or_default(),
         });
@@ -325,7 +327,7 @@ fn handle_external_upgrade(
         println!("Upgrade cancelled.");
     }
     Ok(UpgradeResult {
-        previous: VERSION.to_string(),
+        previous: crate::VERSION.to_string(),
         current: latest_ver.to_string(),
         path: std::env::current_exe().unwrap_or_default(),
     })
@@ -412,10 +414,10 @@ fn do_prebuilt_upgrade(
     replace_binary(&extracted_binary, current_exe)?;
     verify_version(current_exe, latest_ver)?;
 
-    println!("codemux: upgraded v{} → v{} ✓", VERSION, latest_ver);
+    println!("codemux: upgraded v{} → v{} ✓", crate::VERSION, latest_ver);
 
     Ok(UpgradeResult {
-        previous: VERSION.to_string(),
+        previous: crate::VERSION.to_string(),
         current: latest_ver.to_string(),
         path: current_exe.to_path_buf(),
     })

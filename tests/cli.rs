@@ -45,7 +45,30 @@ impl Fixture {
             .expect("read mock metadata")
             .permissions();
         permissions.set_mode(0o755);
-        fs::set_permissions(path, permissions).expect("make mock executable");
+        fs::set_permissions(&path, permissions).expect("make mock executable");
+    }
+
+    /// Creates a mock `curl` that returns a fake GitHub API releases JSON response.
+    /// The mock responds with the given `tag_name` when any argument contains
+    /// "releases/latest", and fails otherwise.
+    fn add_mock_curl(&self, tag_name: &str) {
+        let script = format!(
+            r#"#!/bin/sh
+# Mock curl for codemux upgrade tests
+case "$*" in
+    *releases/latest*)
+        printf '{{"tag_name": "{}"}}\n'
+        exit 0
+        ;;
+    *)
+        echo "mock-curl: unexpected args: $*" >&2
+        exit 1
+        ;;
+esac
+"#,
+            tag_name
+        );
+        self.write_executable("curl", &script);
     }
 
     fn add_mux(&self, name: &str) {
@@ -182,4 +205,168 @@ fn version_flag_prints_version() {
     assert!(output.status.success());
     let stdout = text(&output.stdout);
     assert!(stdout.starts_with("codemux "));
+}
+
+#[cfg(unix)]
+#[test]
+fn check_version_flag_prints_latest_version() {
+    let fixture = Fixture::new("check-version-test");
+    fixture.add_mock_curl("v99.0.0");
+
+    let output = fixture
+        .command()
+        .args(["--check-version"])
+        .output()
+        .expect("spawn codemux");
+
+    assert!(
+        output.status.success(),
+        "codemux failed with stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = text(&output.stdout);
+    assert!(
+        stdout.contains("Latest version: v99.0.0"),
+        "expected 'Latest version: v99.0.0' in stdout, got: {}",
+        stdout
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn upgrade_check_flag_reports_update_available() {
+    let fixture = Fixture::new("upgrade-check-test");
+    fixture.add_mock_curl("v99.0.0");
+
+    let output = fixture
+        .command()
+        .args(["--upgrade", "--check"])
+        .output()
+        .expect("spawn codemux");
+
+    assert!(
+        output.status.success(),
+        "codemux failed with stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = text(&output.stdout);
+    assert!(
+        stdout.contains("Latest version: v99.0.0"),
+        "expected 'Latest version: v99.0.0' in stdout, got: {}",
+        stdout
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn upgrade_flag_no_curl_reports_error() {
+    let fixture = Fixture::new("no-curl-test");
+    // Don't add curl — it won't be on PATH
+
+    let output = fixture
+        .command()
+        .args(["--upgrade", "--check"])
+        .output()
+        .expect("spawn codemux");
+
+    assert!(!output.status.success());
+    let stderr = text(&output.stderr);
+    assert!(
+        stderr.contains("codemux: upgrade requires curl"),
+        "expected error about missing curl, got: {}",
+        stderr
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn check_version_flag_no_curl_reports_error() {
+    let fixture = Fixture::new("check-ver-no-curl");
+    // Don't add curl — it won't be on PATH
+
+    let output = fixture
+        .command()
+        .args(["--check-version"])
+        .output()
+        .expect("spawn codemux");
+
+    assert!(!output.status.success());
+    let stderr = text(&output.stderr);
+    assert!(
+        stderr.contains("codemux: upgrade requires curl"),
+        "expected error about missing curl, got: {}",
+        stderr
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn upgrade_check_flag_already_latest_reports_up_to_date() {
+    let fixture = Fixture::new("already-latest-test");
+    // Mock curl returns a version lower than current (0.3.0)
+    fixture.add_mock_curl("v0.2.0");
+
+    let output = fixture
+        .command()
+        .args(["--upgrade", "--check"])
+        .output()
+        .expect("spawn codemux");
+
+    assert!(!output.status.success());
+    let stderr = text(&output.stderr);
+    assert!(
+        stderr.contains("already up to date"),
+        "expected 'already up to date' error, got: {}",
+        stderr
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn upgrade_check_flag_malformed_json_reports_parse_error() {
+    let fixture = Fixture::new("malformed-json-test");
+    // Mock curl returns JSON without a tag_name key
+    fixture.write_executable(
+        "curl",
+        "#!/bin/sh\ncase \"$*\" in\n    *releases/latest*)\n        printf '{\"not_tag_name\": \"v1.0.0\"}\\n'\n        exit 0\n        ;;\n    *)\n        echo \"mock-curl: unexpected args: $*\" >&2\n        exit 1\n        ;;\nesac\n",
+    );
+
+    let output = fixture
+        .command()
+        .args(["--upgrade", "--check"])
+        .output()
+        .expect("spawn codemux");
+
+    assert!(!output.status.success());
+    let stderr = text(&output.stderr);
+    assert!(
+        stderr.contains("failed to parse version"),
+        "expected 'failed to parse version' error, got: {}",
+        stderr
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn upgrade_check_with_yes_flag_works() {
+    let fixture = Fixture::new("upgrade-check-yes-test");
+    fixture.add_mock_curl("v99.0.0");
+
+    let output = fixture
+        .command()
+        .args(["--upgrade", "--check", "--yes"])
+        .output()
+        .expect("spawn codemux");
+
+    assert!(
+        output.status.success(),
+        "codemux failed with stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = text(&output.stdout);
+    assert!(
+        stdout.contains("Latest version: v99.0.0"),
+        "expected 'Latest version: v99.0.0' in stdout, got: {}",
+        stdout
+    );
 }
