@@ -1,6 +1,6 @@
 # Zed Integration Guide for CodeMux
 
-This document describes how to integrate **CodeMux** with [Zed](https://zed.dev/), the high-performance multiplayer code editor. CodeMux follows the integration pattern established by [fff-gpui](https://github.com/th0jensen/fff-gpui) — a pure Rust binary that integrates via Zed's configuration files rather than a bundled extension.
+This document describes how to integrate **CodeMux** with [Zed](https://zed.dev/), the high-performance multiplayer code editor. CodeMux follows the integration pattern established by [fff-gpui](https://github.com/th0jensen/fff-gpui) — a pure Rust binary that integrates via Zed's configuration files, plus a lightweight companion extension for discoverability.
 
 ## Overview
 
@@ -12,7 +12,7 @@ Before configuring Zed, you need to build and install the `codemux` binary:
 
 ```bash
 # Clone the repository
-git clone https://github.com/jellydn/codemux.git
+git clone https://github.com/jellydn/zed-codemux.git
 cd codemux
 
 # Build the release binary

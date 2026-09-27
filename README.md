@@ -19,7 +19,7 @@
 
 > Open Zed terminals inside **tmux** or **zellij** — port of [vscode-mux](https://github.com/jellydn/vscode-mux) to the [Zed editor](https://zed.dev).
 
-A small native CLI binary, in the spirit of [`fff-gpui`](https://github.com/th0jensen/fff-gpui) — **no Zed extension, no WASM, no marketplace** — just a Rust binary you point Zed at via `settings.json` or `tasks.json`. Same name, same behavior, same session names as `vscode-mux`, so jumping between editors lands you in the same tmux/zellij session.
+A small native CLI binary, in the spirit of [`fff-gpui`](https://github.com/th0jensen/fff-gpui) — just a Rust binary you point Zed at via `settings.json` or `tasks.json`, plus an optional Zed extension for discoverability. Same name, same behavior, same session names as `vscode-mux`, so jumping between editors lands you in the same tmux/zellij session.
 
 ## Why CodeMux?
 
@@ -256,7 +256,7 @@ codemux --upgrade --yes
 
 | Decision                                 | Why                                                                                                                                      |
 | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| **Pure native binary, no Zed extension** | Zed's extension API doesn't expose terminal-profile hooks (yet). Going binary-first is simpler, faster, and works today.                 |
+| **Binary-first, companion Zed extension** | Zed's extension API doesn't expose terminal-profile hooks (yet), so the multiplexer integration ships as a binary — simpler, faster, and works today. A lightweight extension aids discoverability. |
 | **Zed integration via user config**      | Use Zed's existing `settings.json` / `tasks.json` / `keymap.json` — no new APIs to learn, no extension manifests, no marketplace review. |
 | **One Rust crate, one binary**           | No `[lib]`, no WASM target. Just `cargo build --release`.                                                                                |
 | **Zero dependencies**                    | Pure stdlib — no external crates for the core CLI.                                                                                       |
