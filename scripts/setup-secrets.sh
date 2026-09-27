@@ -105,8 +105,7 @@ if ! echo "$EXISTING_SECRETS" | grep -q "HOMEBREW_TAP_TOKEN"; then
 		# Validate token against jellydn/homebrew-tap
 		echo ""
 		echo -e "${BLUE}Validating token access to jellydn/homebrew-tap...${NC}"
-		if echo "$HOMEBREW_TOKEN" | gh auth login --with-token 2>/dev/null &&
-			gh repo view jellydn/homebrew-tap --json name &>/dev/null; then
+		if GH_TOKEN="$HOMEBREW_TOKEN" gh repo view jellydn/homebrew-tap --json name &>/dev/null; then
 			echo -e "${GREEN}✓ Token has access to jellydn/homebrew-tap${NC}"
 		else
 			echo -e "${YELLOW}⚠️  Token could not access jellydn/homebrew-tap${NC}"
@@ -117,14 +116,8 @@ if ! echo "$EXISTING_SECRETS" | grep -q "HOMEBREW_TAP_TOKEN"; then
 	fi
 	echo ""
 else
-	# Validate existing token
-	echo -e "${BLUE}🍺 Validating existing HOMEBREW_TAP_TOKEN...${NC}"
-	TOKEN=$(gh secret list -R "$REPO" --json name,value -q '.[] | select(.name=="HOMEBREW_TAP_TOKEN") | .value' 2>/dev/null || true)
-	if [[ -z "$TOKEN" ]]; then
-		echo -e "${YELLOW}⚠️  Cannot retrieve HOMEBREW_TAP_TOKEN for validation${NC}"
-		echo "   It may exist but is masked. Test by re-running the release workflow."
-	fi
 	echo -e "${GREEN}✓ HOMEBREW_TAP_TOKEN is set${NC}"
+	echo "   GitHub masks stored values; re-run the release workflow to validate it."
 fi
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
