@@ -10,7 +10,7 @@
 
 ### Unit Tests (inline modules)
 
-Each source module has a corresponding `*_tests.rs` file, loaded via `#[path]` attribute in `main.rs`:
+Most source modules have a corresponding `*_tests.rs` file, loaded via `#[path]` attribute in `main.rs`; `upgrade.rs` keeps its unit tests inline:
 
 | Source | Test File | Focus |
 |--------|-----------|-------|
@@ -20,31 +20,23 @@ Each source module has a corresponding `*_tests.rs` file, loaded via `#[path]` a
 | `src/sanitize.rs` | `src/sanitize_tests.rs` | Session name sanitization, gap-filling |
 | `src/tmux.rs` | `src/tmux_tests.rs` | Command building |
 | `src/zellij.rs` | `src/zellij_tests.rs` | Command building, socket dir |
-| `src/upgrade.rs` | (inline `#[cfg(test)] mod tests`) | Version parsing, prerelease stripping |
+| `src/upgrade.rs` | (inline `#[cfg(test)] mod tests`) | Version parsing and SemVer precedence |
 
-**Total unit tests:** ~123 (from `src/main_tests.rs` and inline modules)
+**Total unit tests:** 126
 
 ### Integration Tests
 
 | File | Focus |
 |------|-------|
-| `tests/cli.rs` | End-to-end CLI tests: `--version`, `--help`, `--init` output validation |
+| `tests/cli.rs` | End-to-end CLI, process replacement, and upgrade-option tests |
 
-**Total integration tests:** 5
+**Total integration tests:** 14
 
 ## Test Patterns
 
 ### Dependency Injection
 
-Functions that depend on environment variables accept them as parameters for testability:
-
-```rust
-// Production
-debug_enabled(&env_map)
-
-// Testable
-fn debug_enabled(env: &HashMap<String, String>) -> bool
-```
+Multiplexer detection accepts an environment lookup closure for testability:
 
 ```rust
 // Production (detect module)
@@ -90,8 +82,8 @@ cargo test -- --nocapture       # Show stdout/stderr during tests
 | Multiplexer detection | High — env, config, PATH fallback, missing multiplexer |
 | Shell escaping | High — quotes, empty strings, special characters |
 | Command building | Medium — template verification |
-| Upgrade (version parsing) | Medium — prerelease suffixes, malformed input |
-| CLI integration | Low — only `--version`, `--help`, `--init` |
-| Upgrade (CLI flags) | None — `--upgrade`, `--check-version` not tested |
-| Network (GitHub API) | None — no mock HTTP server |
+| Upgrade (version parsing) | Medium — prerelease precedence, build metadata, malformed input |
+| CLI integration | Medium — process replacement and built-in options |
+| Upgrade (CLI flags) | Medium — mocked curl and package-manager commands |
+| Network (GitHub API) | Low — curl is mocked; no HTTP server |
 | Binary replacement | None — requires filesystem state |

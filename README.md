@@ -230,6 +230,9 @@ CodeMux can update itself to the latest release:
 # Check if a newer version is available
 codemux --check-version
 
+# Check without installing an available update
+codemux --upgrade --check
+
 # Upgrade to the latest version (interactive)
 codemux --upgrade
 
@@ -240,6 +243,7 @@ codemux --upgrade --yes
 - **Cargo** installations: runs `cargo install codemux --force`
 - **Homebrew** installations: runs `brew upgrade codemux`
 - **Prebuilt binary** installations: downloads and atomically replaces the current binary
+- **Windows**: version checks are supported, but `--upgrade` is not yet supported
 
 ## Requirements
 

@@ -17,7 +17,7 @@ pub struct UpgradeResult {
 /// Errors that can occur during the upgrade process.
 #[derive(Debug)]
 pub enum UpgradeError {
-    /// curl (or PowerShell on Windows) was not found on PATH.
+    /// curl was not found on PATH.
     CurlNotFound,
     /// A network request failed.
     NetworkError(String),
@@ -32,6 +32,8 @@ pub enum UpgradeError {
     AlreadyLatest { current: String },
     /// The GitHub API response could not be parsed.
     ParseError(String),
+    /// The downloaded binary failed validation.
+    VerificationError(String),
     /// A filesystem I/O error occurred.
     IoError(io::Error),
     /// Windows upgrade via binary replacement is not yet supported.
@@ -67,6 +69,9 @@ impl fmt::Display for UpgradeError {
             UpgradeError::ParseError(msg) => {
                 write!(f, "failed to parse version: {}", msg)
             }
+            UpgradeError::VerificationError(msg) => {
+                write!(f, "upgrade verification failed: {}", msg)
+            }
             UpgradeError::IoError(e) => {
                 write!(f, "{}", e)
             }
@@ -89,7 +94,7 @@ fn debug_enabled() -> bool {
         .unwrap_or(false)
 }
 
-fn find_curl() -> Result<String, UpgradeError> {
+fn find_curl() -> Result<PathBuf, UpgradeError> {
     let curl_candidates: &[&str] = if cfg!(windows) {
         &["curl.exe", "curl.cmd"]
     } else {
@@ -100,35 +105,35 @@ fn find_curl() -> Result<String, UpgradeError> {
             return Ok(path);
         }
     }
-    #[cfg(windows)]
-    {
-        if let Ok(path) = which_powershell() {
-            return Ok(path);
-        }
-    }
     Err(UpgradeError::CurlNotFound)
 }
 
-fn which(name: &str) -> Result<String, ()> {
-    let path_env = std::env::var("PATH").unwrap_or_default();
-    let path_sep = if cfg!(windows) { ';' } else { ':' };
-    for dir in path_env.split(path_sep) {
-        let full = std::path::Path::new(dir).join(name);
-        if full.is_file() {
-            return Ok(full.to_string_lossy().into_owned());
+fn which(name: &str) -> Result<PathBuf, ()> {
+    let path_env = std::env::var_os("PATH").unwrap_or_default();
+    for dir in std::env::split_paths(&path_env) {
+        let full = dir.join(name);
+        if is_executable(&full) {
+            return Ok(full);
         }
     }
     Err(())
 }
 
-#[cfg(windows)]
-fn which_powershell() -> Result<String, ()> {
-    for name in &["pwsh.exe", "powershell.exe"] {
-        if let Ok(path) = which(name) {
-            return Ok(path);
-        }
+fn is_executable(path: &std::path::Path) -> bool {
+    if !path.is_file() {
+        return false;
     }
-    Err(())
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        path.metadata()
+            .map(|metadata| metadata.permissions().mode() & 0o111 != 0)
+            .unwrap_or(false)
+    }
+
+    #[cfg(not(unix))]
+    true
 }
 
 /// Extracts the `tag_name` value from a minimal GitHub API JSON response.
@@ -144,35 +149,83 @@ fn parse_tag_name(json: &str) -> Option<String> {
     Some(value_start[..value_end].to_string())
 }
 
+type VersionCore = (u32, u32, u32);
+type ParsedVersion<'a> = (VersionCore, Option<&'a str>);
+
 /// Parses a version string like `"1.2.3"` or `"v1.2.3"` into a `(major, minor, patch)` tuple.
-/// Strips any prerelease suffix (e.g. `"v1.2.3-rc1"` parses as `(1, 2, 3)`).
-pub fn parse_version(s: &str) -> Option<(u32, u32, u32)> {
+/// Ignores prerelease and build metadata in the returned core version.
+#[cfg(test)]
+fn parse_version(s: &str) -> Option<VersionCore> {
+    parse_version_parts(s).map(|(core, _)| core)
+}
+
+fn parse_version_parts(s: &str) -> Option<ParsedVersion<'_>> {
     let s = s.strip_prefix('v').unwrap_or(s);
-    let mut parts: Vec<&str> = s.splitn(3, '.').collect();
-    if parts.len() != 3 {
+    let version = s.split_once('+').map_or(s, |(version, _)| version);
+    let (core, prerelease) = match version.split_once('-') {
+        Some((_core, "")) => return None,
+        Some((core, prerelease)) => (core, Some(prerelease)),
+        None => (version, None),
+    };
+    let mut parts = core.split('.');
+    let parsed = (
+        parts.next()?.parse().ok()?,
+        parts.next()?.parse().ok()?,
+        parts.next()?.parse().ok()?,
+    );
+    if parts.next().is_some() {
         return None;
     }
-    // Strip any suffix from the patch component (e.g. "3-rc1" → "3")
-    let patch_str = parts[2];
-    let digit_end = patch_str
-        .find(|c: char| !c.is_ascii_digit())
-        .unwrap_or(patch_str.len());
-    parts[2] = &patch_str[..digit_end];
-    if parts[2].is_empty() {
-        return None;
+    Some((parsed, prerelease))
+}
+
+fn compare_prerelease(left: Option<&str>, right: Option<&str>) -> std::cmp::Ordering {
+    match (left, right) {
+        (None, None) => std::cmp::Ordering::Equal,
+        (None, Some(_)) => std::cmp::Ordering::Greater,
+        (Some(_), None) => std::cmp::Ordering::Less,
+        (Some(left), Some(right)) => {
+            let mut left = left.split('.');
+            let mut right = right.split('.');
+            loop {
+                match (left.next(), right.next()) {
+                    (Some(left), Some(right)) => {
+                        let ordering = compare_prerelease_identifier(left, right);
+                        if ordering != std::cmp::Ordering::Equal {
+                            return ordering;
+                        }
+                    }
+                    (Some(_), None) => return std::cmp::Ordering::Greater,
+                    (None, Some(_)) => return std::cmp::Ordering::Less,
+                    (None, None) => return std::cmp::Ordering::Equal,
+                }
+            }
+        }
     }
-    Some((
-        parts[0].parse().ok()?,
-        parts[1].parse().ok()?,
-        parts[2].parse().ok()?,
-    ))
+}
+
+fn compare_prerelease_identifier(left: &str, right: &str) -> std::cmp::Ordering {
+    let left_numeric = left.chars().all(|c| c.is_ascii_digit());
+    let right_numeric = right.chars().all(|c| c.is_ascii_digit());
+    match (left_numeric, right_numeric) {
+        (true, true) => {
+            let left = left.trim_start_matches('0');
+            let right = right.trim_start_matches('0');
+            left.len().cmp(&right.len()).then_with(|| left.cmp(right))
+        }
+        (true, false) => std::cmp::Ordering::Less,
+        (false, true) => std::cmp::Ordering::Greater,
+        (false, false) => left.cmp(right),
+    }
 }
 
 /// Compares two version strings (with optional "v" prefix).
 /// Falls back to lexical comparison when either version cannot be parsed.
 fn version_cmp(latest: &str, current: &str) -> std::cmp::Ordering {
-    match (parse_version(latest), parse_version(current)) {
-        (Some(l), Some(c)) => l.cmp(&c),
+    match (parse_version_parts(latest), parse_version_parts(current)) {
+        (Some((latest_core, latest_pre)), Some((current_core, current_pre))) => latest_core
+            .cmp(&current_core)
+            .then_with(|| compare_prerelease(latest_pre, current_pre)),
         (Some(_), None) => std::cmp::Ordering::Greater,
         (None, Some(_)) => std::cmp::Ordering::Less,
         (None, None) => latest.cmp(current),
@@ -213,7 +266,10 @@ fn platform_asset_name() -> Result<&'static str, UpgradeError> {
 fn prompt_yes_no(prompt: &str) -> bool {
     eprint!("{} [Y/n]: ", prompt);
     let mut input = String::new();
-    std::io::stdin().read_line(&mut input).ok();
+    match std::io::stdin().read_line(&mut input) {
+        Ok(0) | Err(_) => return false,
+        Ok(_) => {}
+    }
     let trimmed = input.trim().to_lowercase();
     trimmed.is_empty() || trimmed == "y" || trimmed == "yes"
 }
@@ -282,6 +338,14 @@ pub fn upgrade(check_only: bool, yes: bool) -> Result<UpgradeResult, UpgradeErro
     let latest_ver = latest_tag.strip_prefix('v').unwrap_or(&latest_tag);
 
     if version_cmp(&latest_tag, &format!("v{}", crate::VERSION)) != std::cmp::Ordering::Greater {
+        if check_only {
+            println!("Already up to date (current: v{})", crate::VERSION);
+            return Ok(UpgradeResult {
+                previous: crate::VERSION.to_string(),
+                current: crate::VERSION.to_string(),
+                path: std::env::current_exe().unwrap_or_default(),
+            });
+        }
         return Err(UpgradeError::AlreadyLatest {
             current: crate::VERSION.to_string(),
         });
@@ -303,11 +367,15 @@ pub fn upgrade(check_only: bool, yes: bool) -> Result<UpgradeResult, UpgradeErro
     let method = detect_install_method();
 
     match method {
-        InstallMethod::Cargo => {
-            handle_external_upgrade("cargo install codemux --force", "cargo", latest_ver, yes)
-        }
+        InstallMethod::Cargo => handle_external_upgrade(
+            "cargo",
+            &["install", "codemux", "--force"],
+            "cargo",
+            latest_ver,
+            yes,
+        ),
         InstallMethod::Homebrew => {
-            handle_external_upgrade("brew upgrade codemux", "Homebrew", latest_ver, yes)
+            handle_external_upgrade("brew", &["upgrade", "codemux"], "Homebrew", latest_ver, yes)
         }
         InstallMethod::Prebuilt => {
             let current_exe = std::env::current_exe().map_err(UpgradeError::IoError)?;
@@ -318,21 +386,31 @@ pub fn upgrade(check_only: bool, yes: bool) -> Result<UpgradeResult, UpgradeErro
 
 /// Prompts the user and optionally runs an external package-manager upgrade command.
 fn handle_external_upgrade(
-    cmd: &str,
+    program: &str,
+    args: &[&str],
     label: &str,
     latest_ver: &str,
     yes: bool,
 ) -> Result<UpgradeResult, UpgradeError> {
+    let command = std::iter::once(program)
+        .chain(args.iter().copied())
+        .collect::<Vec<_>>()
+        .join(" ");
     println!("Detected {} installation.", label);
-    println!("Recommended command: {}", cmd);
-    if yes || prompt_yes_no("Run this command?") {
-        run_command(cmd)?;
+    println!("Recommended command: {}", command);
+    let upgraded = yes || prompt_yes_no("Run this command?");
+    if upgraded {
+        run_command(program, args)?;
     } else {
         println!("Upgrade cancelled.");
     }
     Ok(UpgradeResult {
         previous: crate::VERSION.to_string(),
-        current: latest_ver.to_string(),
+        current: if upgraded {
+            latest_ver.to_string()
+        } else {
+            crate::VERSION.to_string()
+        },
         path: std::env::current_exe().unwrap_or_default(),
     })
 }
@@ -349,13 +427,19 @@ fn perform_prebuilt_upgrade(
         eprintln!("[codemux] Downloading asset: {}", asset);
     }
 
-    let tmp_dir = std::env::temp_dir().join(format!("codemux-upgrade-{}", std::process::id()));
-    std::fs::create_dir_all(&tmp_dir)?;
+    let unique = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let tmp_dir =
+        std::env::temp_dir().join(format!("codemux-upgrade-{}-{}", std::process::id(), unique));
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&tmp_dir, std::fs::Permissions::from_mode(0o700))?;
+        use std::os::unix::fs::DirBuilderExt;
+        std::fs::DirBuilder::new().mode(0o700).create(&tmp_dir)?;
     }
+    #[cfg(not(unix))]
+    std::fs::create_dir(&tmp_dir)?;
 
     // Ensure the temp directory is always cleaned up, even on error.
     let result = do_prebuilt_upgrade(latest_tag, latest_ver, current_exe, asset, &tmp_dir);
@@ -363,7 +447,7 @@ fn perform_prebuilt_upgrade(
     result
 }
 
-/// Core prebuilt upgrade logic (download, extract, replace, verify).
+/// Core prebuilt upgrade logic (download, extract, verify, replace).
 fn do_prebuilt_upgrade(
     latest_tag: &str,
     latest_ver: &str,
@@ -415,8 +499,8 @@ fn do_prebuilt_upgrade(
         ));
     }
 
+    verify_version(&extracted_binary, latest_ver)?;
     replace_binary(&extracted_binary, current_exe)?;
-    verify_version(current_exe, latest_ver)?;
 
     println!("codemux: upgraded v{} → v{} ✓", crate::VERSION, latest_ver);
 
@@ -427,11 +511,8 @@ fn do_prebuilt_upgrade(
     })
 }
 
-fn run_command(cmd: &str) -> Result<(), UpgradeError> {
-    let mut parts = cmd.split_whitespace();
-    let program = parts.next().unwrap_or(cmd);
-    let args: Vec<&str> = parts.collect();
-    let status = Command::new(program).args(&args).status()?;
+fn run_command(program: &str, args: &[&str]) -> Result<(), UpgradeError> {
+    let status = Command::new(program).args(args).status()?;
     if !status.success() {
         return Err(UpgradeError::NetworkError(format!(
             "command exited with status: {:?}",
@@ -477,19 +558,21 @@ fn verify_version(binary: &std::path::Path, expected: &str) -> Result<(), Upgrad
     let output = Command::new(binary)
         .arg("--version")
         .output()
-        .map_err(|_| {
+        .map_err(|e| {
             UpgradeError::IoError(io::Error::new(
-                io::ErrorKind::Other,
-                "failed to run updated binary",
+                e.kind(),
+                format!("failed to run downloaded binary: {}", e),
             ))
         })?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    if !stdout.contains(expected) {
-        return Err(UpgradeError::NetworkError(format!(
-            "version mismatch after upgrade: expected {}, got {}",
-            expected,
-            stdout.trim()
+    let expected_output = format!("codemux {}", expected);
+    if !output.status.success() || stdout.trim() != expected_output {
+        return Err(UpgradeError::VerificationError(format!(
+            "expected '{}', got '{}' (status: {})",
+            expected_output,
+            stdout.trim(),
+            output.status
         )));
     }
 
@@ -499,6 +582,18 @@ fn verify_version(binary: &std::path::Path, expected: &str) -> Result<(), Upgrad
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    fn write_test_executable(path: &std::path::Path, contents: &str) {
+        use std::os::unix::fs::PermissionsExt;
+
+        std::fs::write(path, contents).expect("write test executable");
+        let mut permissions = std::fs::metadata(path)
+            .expect("read test executable metadata")
+            .permissions();
+        permissions.set_mode(0o755);
+        std::fs::set_permissions(path, permissions).expect("make test executable executable");
+    }
 
     #[test]
     fn test_parse_version_strips_prerelease() {
@@ -513,5 +608,58 @@ mod tests {
         assert_eq!(parse_version("v1.2"), None);
         assert_eq!(parse_version("not-a-version"), None);
         assert_eq!(parse_version(""), None);
+    }
+
+    #[test]
+    fn test_version_comparison_follows_prerelease_precedence() {
+        use std::cmp::Ordering;
+
+        assert_eq!(version_cmp("v1.2.3", "v1.2.3-rc1"), Ordering::Greater);
+        assert_eq!(version_cmp("v1.2.3-rc2", "v1.2.3-rc1"), Ordering::Greater);
+        assert_eq!(version_cmp("v1.2.3-1", "v1.2.3-alpha"), Ordering::Less);
+        assert_eq!(
+            version_cmp("v1.2.3+build.2", "v1.2.3+build.1"),
+            Ordering::Equal
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_is_executable_checks_permission_bits() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let temp = tempfile::tempdir().expect("create temporary directory");
+        let path = temp.path().join("curl");
+        std::fs::write(&path, "not executable").expect("write test file");
+        assert!(!is_executable(&path));
+
+        let mut permissions = std::fs::metadata(&path)
+            .expect("read test file metadata")
+            .permissions();
+        permissions.set_mode(0o755);
+        std::fs::set_permissions(&path, permissions).expect("make test file executable");
+        assert!(is_executable(&path));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_verify_version_requires_exact_successful_output() {
+        let temp = tempfile::tempdir().expect("create temporary directory");
+        let binary = temp.path().join("codemux");
+
+        write_test_executable(&binary, "#!/bin/sh\necho 'codemux 1.2.30'\n");
+        assert!(matches!(
+            verify_version(&binary, "1.2.3"),
+            Err(UpgradeError::VerificationError(_))
+        ));
+
+        write_test_executable(&binary, "#!/bin/sh\necho 'codemux 1.2.3'\nexit 1\n");
+        assert!(matches!(
+            verify_version(&binary, "1.2.3"),
+            Err(UpgradeError::VerificationError(_))
+        ));
+
+        write_test_executable(&binary, "#!/bin/sh\necho 'codemux 1.2.3'\n");
+        assert!(verify_version(&binary, "1.2.3").is_ok());
     }
 }

@@ -4,7 +4,7 @@
 
 ## Top-Level Layout
 
-```
+```text
 .
 ├── Cargo.toml              # Root package manifest, workspace definition
 ├── Cargo.lock              # Locked dependency versions
@@ -36,7 +36,7 @@
 │   └── zellij_tests.rs     # Tests for zellij command building
 │
 ├── tests/                  # Integration tests
-│   └── cli.rs              # End-to-end CLI tests (--version, --help, --init)
+│   └── cli.rs              # End-to-end CLI and upgrade-option tests
 │
 ├── extension/              # Zed extension crate (workspace member)
 │   ├── Cargo.toml          # cdylib crate manifest

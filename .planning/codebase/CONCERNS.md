@@ -22,33 +22,7 @@ The config parser is a hand-rolled, lenient TOML parser that:
 
 **Mitigation:** The GitHub Releases API response format is stable. The function returns `Option` and surfaces a `ParseError` on failure.
 
-### 3. `--upgrade` CLI Flags Not Tested
-
-The `--upgrade`, `--check-version`, `--check`, and `--yes` flags are wired into `parse_args()` but have no integration tests in `tests/cli.rs`. The upgrade module's unit tests only cover `parse_version`.
-
-**Risk:** Flag parsing regressions would only be caught manually.
-
-### 4. Duplicate `VERSION` Constant
-
-Both `src/main.rs` and `src/upgrade.rs` define:
-```rust
-const VERSION: &str = env!("CARGO_PKG_VERSION");
-```
-
-**Risk:** If version handling changes in one file, the other could become inconsistent. Should be consolidated into a shared constant.
-
-### 5. `run_command()` Simplistic Splitting
-
-`run_command()` splits the command string on whitespace:
-```rust
-let mut parts = cmd.split_whitespace();
-```
-
-This works for the two known commands (`cargo install codemux --force`, `brew upgrade codemux`) but would break on quoted arguments or arguments containing spaces.
-
-**Mitigation:** Only used for hardcoded command strings. Not exposed for arbitrary user input.
-
-### 6. Zellij Inside-Session Detection (TODO in `src/zellij.rs`)
+### 3. Zellij Inside-Session Detection (TODO in `src/zellij.rs`)
 
 The `ZellijLauncher` does not implement `is_inside_session()`:
 ```rust
@@ -67,8 +41,8 @@ The `ZellijLauncher` does not implement `is_inside_session()`:
 ### 2. Temporary Directory Permissions (Fixed)
 
 The prebuilt upgrade temp directory now uses:
-- Unique name with PID: `codemux-upgrade-{PID}`
-- Restrictive permissions: `0o700` on Unix
+- Unique name with the PID and current timestamp
+- Atomic creation with restrictive permissions (`0o700`) on Unix
 
 Previously used a static name (`codemux-upgrade`) without restrictive permissions, creating a symlink/race risk.
 
@@ -78,7 +52,7 @@ If `replace_binary()` fails (e.g., permission denied), the temporary `.codemux-u
 
 ### 4. Shell Injection Prevention
 
-`shell_escape()` wraps all user-controlled strings in single quotes before embedding in shell commands. This prevents injection from session names, paths, or CLI arguments.
+`shell_escape()` protects session names and paths before they are embedded in POSIX shell commands. Forwarded CLI arguments are not covered by this helper.
 
 ## Performance
 
@@ -96,7 +70,7 @@ If `replace_binary()` fails (e.g., permission denied), the temporary `.codemux-u
 
 | Concern | Detail |
 |---------|--------|
-| Windows upgrade | `upgrade()` returns `WindowsNotSupported` — prebuilt binary replacement not implemented |
+| Windows upgrade | `upgrade()` returns `WindowsNotSupported` for all installation methods |
 | Zellij CWD | In non-auto-attach mode, zellij ignores the `-c` flag — warns to stderr |
 | Zellij socket path | Uses `/tmp/z` instead of `$TMPDIR` to avoid 103-byte IPC socket limit on macOS |
 | ARM Linux CI | `ubuntu-24.04-arm` runner is relatively new — may have limited availability |

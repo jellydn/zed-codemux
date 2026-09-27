@@ -7,7 +7,7 @@
 | Service | Purpose | Called From | Authentication |
 |---------|---------|-------------|----------------|
 | GitHub Releases API (`api.github.com/repos/jellydn/zed-codemux/releases/latest`) | Fetch latest release tag for self-upgrade | `src/upgrade.rs::check_latest()` | None (public API) |
-| GitHub Releases (download) | Download prebuilt binary tarball | `src/upgrade.rs::do_prebuilt_upgrade()` | None |
+| GitHub Releases (download) | Download a Unix prebuilt tarball (Windows release assets are ZIP files) | `src/upgrade.rs::perform_prebuilt_upgrade()` | None |
 
 ## Distribution Channels
 
@@ -45,7 +45,7 @@
 
 | Tool | Purpose | Fallback |
 |------|---------|----------|
-| `curl` | GitHub API requests + binary downloads | Falls back to `pwsh.exe` on Windows; errors if not found |
+| `curl` | GitHub API requests + binary downloads | Errors if not found |
 | `tar` | Extract prebuilt binary tarballs | None (required for prebuilt upgrade path) |
 | `tmux` | Terminal multiplexer (session creation, listing) | Graceful fallback to zellij or `$SHELL` |
 | `zellij` | Terminal multiplexer (session creation, listing) | Graceful fallback to tmux or `$SHELL` |

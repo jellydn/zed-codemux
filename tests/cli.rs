@@ -85,7 +85,11 @@ esac
     }
 
     fn command(&self) -> Command {
-        let mut command = Command::new(env!("CARGO_BIN_EXE_codemux"));
+        self.command_for(env!("CARGO_BIN_EXE_codemux"))
+    }
+
+    fn command_for(&self, executable: impl AsRef<std::ffi::OsStr>) -> Command {
+        let mut command = Command::new(executable);
         command
             .current_dir(&self.workspace)
             .env("PATH", &self.bin_dir)
@@ -207,6 +211,19 @@ fn version_flag_prints_version() {
     assert!(stdout.starts_with("codemux "));
 }
 
+#[test]
+fn help_lists_upgrade_options() {
+    let output = Command::new(env!("CARGO_BIN_EXE_codemux"))
+        .args(["--help"])
+        .output()
+        .expect("spawn codemux");
+    assert!(output.status.success());
+    let stdout = text(&output.stdout);
+    assert!(stdout.contains("--check-version"));
+    assert!(stdout.contains("--upgrade"));
+    assert!(stdout.contains("--check and --yes"));
+}
+
 #[cfg(unix)]
 #[test]
 fn check_version_flag_prints_latest_version() {
@@ -312,12 +329,60 @@ fn upgrade_check_flag_already_latest_reports_up_to_date() {
         .output()
         .expect("spawn codemux");
 
-    assert!(!output.status.success());
-    let stderr = text(&output.stderr);
+    assert!(output.status.success());
+    let stdout = text(&output.stdout);
     assert!(
-        stderr.contains("already up to date"),
-        "expected 'already up to date' error, got: {}",
-        stderr
+        stdout.contains("Already up to date"),
+        "expected 'Already up to date' message, got: {}",
+        stdout
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn upgrade_with_closed_stdin_requires_yes_to_run_package_manager() {
+    let fixture = Fixture::new("upgrade-closed-stdin");
+    fixture.add_mock_curl("v99.0.0");
+    let marker = fixture._temp.path().join("cargo-ran");
+    fixture.write_executable(
+        "cargo",
+        "#!/bin/sh\nprintf '%s' \"$*\" > \"$CODEMUX_TEST_CARGO_MARKER\"\n",
+    );
+
+    let cargo_bin = fixture._temp.path().join(".cargo/bin");
+    fs::create_dir_all(&cargo_bin).expect("create cargo binary directory");
+    let codemux = cargo_bin.join("codemux");
+    fs::copy(env!("CARGO_BIN_EXE_codemux"), &codemux).expect("copy codemux test binary");
+    let mut permissions = fs::metadata(&codemux)
+        .expect("read copied binary metadata")
+        .permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(&codemux, permissions).expect("make copied binary executable");
+
+    let output = fixture
+        .command_for(&codemux)
+        .arg("--upgrade")
+        .env("CODEMUX_TEST_CARGO_MARKER", &marker)
+        .stdin(Stdio::null())
+        .output()
+        .expect("spawn codemux");
+
+    assert!(output.status.success());
+    assert!(text(&output.stdout).contains("Upgrade cancelled."));
+    assert!(!marker.exists(), "cargo ran without --yes");
+
+    let output = fixture
+        .command_for(&codemux)
+        .args(["--upgrade", "--yes"])
+        .env("CODEMUX_TEST_CARGO_MARKER", &marker)
+        .stdin(Stdio::null())
+        .output()
+        .expect("spawn codemux");
+
+    assert!(output.status.success());
+    assert_eq!(
+        fs::read_to_string(&marker).expect("read cargo marker"),
+        "install codemux --force"
     );
 }
 

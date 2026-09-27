@@ -12,7 +12,7 @@
 
 ## Module Map
 
-```
+```text
 src/main.rs         ← Entry point, CLI parsing, MuxLauncher trait, exec dispatch, fallback shell
 src/config.rs        ← TOML config loader (~/.config/codemux/config.toml)
 src/detect.rs        ← Multiplexer detection (env → config → PATH probe)
@@ -28,7 +28,7 @@ extension/
 
 ## Data Flow
 
-```
+```text
 User opens Zed terminal
     ↓
 Zed invokes `codemux` (via settings.json or tasks.json)
@@ -73,7 +73,7 @@ POSIX shell escaping: wraps strings in single quotes, handles embedded quotes vi
 
 Self-contained upgrade lifecycle with three install-method strategies:
 - **Cargo/Homebrew**: delegate to the package manager
-- **Prebuilt**: download tarball → extract → atomic rename with temp file → verify
+- **Prebuilt**: download tarball → extract → verify candidate → atomic rename with temp file
 
 ## Platform Strategy
 
@@ -82,7 +82,7 @@ Self-contained upgrade lifecycle with three install-method strategies:
 | Exec model | `CommandExt::exec()` | `Command::status()` + `process::exit()` |
 | Shell fallback | `$SHELL` or `/bin/sh` | `%COMSPEC%` or `cmd.exe` |
 | Upgrade (prebuilt) | Supported | `WindowsNotSupported` error |
-| Upgrade (cargo/homebrew) | Supported | Supported |
+| Upgrade (cargo/homebrew) | Supported | `WindowsNotSupported` error |
 | Temp dir permissions | `0o700` | N/A |
 | Binary permissions | `0o755` | N/A |
 

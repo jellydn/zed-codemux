@@ -22,7 +22,7 @@
 
 ## Workspace Structure
 
-```
+```toml
 [workspace]
 members = ["extension"]
 resolver = "2"
